@@ -52,10 +52,7 @@ import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import net.raphimc.viabedrock.protocol.types.array.ArrayType;
 import net.raphimc.viabedrock.protocol.types.item.BedrockItemType;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
 
 public class ItemRewriter extends StoredObject {
@@ -69,6 +66,7 @@ public class ItemRewriter extends StoredObject {
     private final Type<BedrockItem[]> itemArrayType;
     private final Type<BedrockItem> itemInstanceType;
     private final Type<BedrockItem[]> itemInstanceArrayType;
+    private final List<ItemEntry> entries = new ArrayList<>();
 
     static {
         // TODO: Add missing item nbt rewriters
@@ -247,6 +245,10 @@ public class ItemRewriter extends StoredObject {
 
     public BiMap<String, Integer> getItems() {
         return this.items;
+    }
+
+    public List<ItemEntry> getEntries() {
+        return entries;
     }
 
     public Set<String> getComponentItems() {

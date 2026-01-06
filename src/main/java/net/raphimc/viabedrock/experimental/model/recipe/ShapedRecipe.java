@@ -24,18 +24,18 @@ import java.util.UUID;
 
 public class ShapedRecipe extends Recipe {
 
-    private final ItemDescriptor[][] pattern; // TODO: Better representation?
+    private final List<ItemDescriptor> pattern; // TODO: Better representation?
     private final List<BedrockItem> results;
     private final boolean mirrored;
 
-    public ShapedRecipe(String uniqueId, UUID recipeId, String recipeTag, int priority, ItemDescriptor[][] pattern, List<BedrockItem> results, boolean mirrored) {
+    public ShapedRecipe(String uniqueId, UUID recipeId, String recipeTag, int priority, List<ItemDescriptor> pattern, List<BedrockItem> results, boolean mirrored) {
         super(uniqueId, recipeId, recipeTag, priority);
         this.pattern = pattern;
         this.results = results;
         this.mirrored = mirrored;
     }
 
-    public ItemDescriptor[][] getPattern() {
+    public List<ItemDescriptor> getPattern() {
         return pattern;
     }
 

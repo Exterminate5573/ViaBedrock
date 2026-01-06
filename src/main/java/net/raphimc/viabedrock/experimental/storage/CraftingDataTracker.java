@@ -19,23 +19,100 @@ package net.raphimc.viabedrock.experimental.storage;
 
 import com.viaversion.viaversion.api.connection.StoredObject;
 import com.viaversion.viaversion.api.connection.UserConnection;
+import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
+import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptorType;
+import net.raphimc.viabedrock.experimental.model.recipe.ShapedRecipe;
+import net.raphimc.viabedrock.experimental.model.recipe.ShapelessRecipe;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class CraftingDataTracker extends StoredObject {
 
+    private final Map<Integer, CraftingDataStorage> recipeMap = new HashMap<>();
     private List<CraftingDataStorage> craftingDataList = new ArrayList<>();
 
     public CraftingDataTracker(UserConnection user) {
         super(user);
     }
 
-    public List<CraftingDataStorage> getCraftingDataList() {
-        return craftingDataList;
+    public CraftingDataStorage getResult(List<Integer> ingredients) {
+        final CraftingDataStorage storage = recipeMap.get(ingredients.hashCode());
+        if (storage != null) { // Priority shaped result first
+            return storage;
+        }
+
+        // Then check for shapeless.
+        ingredients.removeIf(i -> i == -1);
+        ingredients.sort(Comparator.comparingInt(Integer::intValue));
+
+        return recipeMap.get(ingredients.hashCode());
     }
 
     public void updateCraftingDataList(List<CraftingDataStorage> craftingDataList) {
         this.craftingDataList = craftingDataList;
+
+        for (final CraftingDataStorage storage : craftingDataList) {
+            switch (storage.type()) {
+                case SHAPELESS -> {
+                    ShapelessRecipe shapelessRecipe = (ShapelessRecipe) storage.recipe();
+
+                    final List<Integer> ingredients = new ArrayList<>();
+                    shapelessRecipe.getIngredients().forEach(descriptor -> {
+                        if (descriptor.getType() == ItemDescriptorType.DEFAULT) {
+                            int itemId = ((ItemDescriptor.DefaultDescriptor) descriptor).itemId();
+
+                            ingredients.add(itemId);
+                        } else if (descriptor.getType() == ItemDescriptorType.ITEM_TAG) {
+                            String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
+                            Integer id = user().get(ItemRewriter.class).getItems().get(tag);
+                            if (id != null) {
+                                ingredients.add(id);
+                            }
+                        }
+                    });
+
+                    ingredients.sort(Comparator.comparingInt(Integer::intValue));
+                    recipeMap.put(ingredients.hashCode(), storage);
+                }
+
+                case SHAPED -> {
+                    ShapedRecipe shapedRecipe = (ShapedRecipe) storage.recipe();
+
+                    final List<Integer> ingredients = new ArrayList<>();
+                    for (int i = 0; i < 9; i++) {
+                        if (shapedRecipe.getPattern().size() <= i) {
+                            ingredients.add(-1);
+                            continue;
+                        }
+
+                        ItemDescriptor descriptor = shapedRecipe.getPattern().get(i);
+                        switch (descriptor.getType()) {
+                            case DEFAULT -> {
+                                int itemId = ((ItemDescriptor.DefaultDescriptor) descriptor).itemId();
+                                boolean empty = itemId == 0 || itemId == -1;
+                                ingredients.add(empty ? -1 : itemId);
+                            }
+                            case INVALID -> ingredients.add(-1);
+                            case ITEM_TAG -> {
+                                String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
+                                Integer id = user().get(ItemRewriter.class).getItems().get(tag);
+                                if (id != null) {
+                                    ingredients.add(id);
+                                }
+                            }
+                        }
+                    }
+
+                    final List<String> debug = new ArrayList<>();
+                    for (int i : ingredients) {
+                        debug.add(user().get(ItemRewriter.class).getItems().inverse().get(i));
+                    }
+
+                    String name = user().get(ItemRewriter.class).getItems().inverse().get(shapedRecipe.getResults().get(0).identifier());
+                    recipeMap.put(ingredients.hashCode(), storage);
+                }
+            }
+        }
     }
 }
