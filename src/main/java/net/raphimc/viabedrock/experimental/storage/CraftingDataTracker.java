@@ -23,6 +23,7 @@ import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
 import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptorType;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapedRecipe;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapelessRecipe;
+import net.raphimc.viabedrock.protocol.model.ItemEntry;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.*;
@@ -95,14 +96,15 @@ public class CraftingDataTracker extends StoredObject {
                             }
                             case INVALID -> ingredients.add(-1);
                             case ITEM_TAG -> {
-//                                String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
-//                                Integer id = user().get(ItemRewriter.class).getItems().get(tag);
-//                                if (id != null) {
-//                                    ingredients.add(id);
+//                                for (ItemEntry entry : user().get(ItemRewriter.class).getEntries()) {
+//                                    if (entry.componentData() != null && entry.componentData().contains(tag)) {
+//                                        ids.add(entry.id());
+//                                    }
 //                                }
                             }
                         }
                     }
+
 
                     recipeMap.put(ingredients.hashCode(), storage);
                 }
