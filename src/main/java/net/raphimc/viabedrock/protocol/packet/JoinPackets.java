@@ -423,6 +423,7 @@ public class JoinPackets {
                     itemDefinitions.addFromNetworkTag(itemEntry.identifier(), itemEntry.componentData());
                 }
             }
+            itemRewriter.getEntries().addAll(List.of(itemEntries));
         });
         protocol.registerClientboundTransition(ClientboundBedrockPackets.AVAILABLE_ENTITY_IDENTIFIERS,
                 State.CONFIGURATION, (PacketHandler) PacketWrapper::cancel, // Bedrock client ignores entity identifiers before start game

@@ -364,11 +364,10 @@ public class ExperimentalFeatures {
                         final String recipeId = wrapper.read(BedrockTypes.STRING);
                         final int width = wrapper.read(BedrockTypes.VAR_INT);
                         final int height = wrapper.read(BedrockTypes.VAR_INT);
-                        final ItemDescriptor[][] ingredients = new ItemDescriptor[height][width];
-                        for (int row = 0; row < height; row++) {
-                            for (int col = 0; col < width; col++) {
-                                ingredients[row][col] = wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTOR_TYPE);
-                            }
+
+                        List<ItemDescriptor> ingredients = new ArrayList<>(width * height);
+                        for (int n = 0; n < width * height; n++) {
+                            ingredients.add(wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTOR_TYPE));
                         }
 
                         final List<BedrockItem> results = List.of(wrapper.read(itemRewriter.itemInstanceArrayType()));
