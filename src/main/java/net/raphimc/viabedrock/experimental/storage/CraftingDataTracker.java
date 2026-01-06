@@ -64,11 +64,11 @@ public class CraftingDataTracker extends StoredObject {
 
                             ingredients.add(itemId);
                         } else if (descriptor.getType() == ItemDescriptorType.ITEM_TAG) {
-                            String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
-                            Integer id = user().get(ItemRewriter.class).getItems().get(tag);
-                            if (id != null) {
-                                ingredients.add(id);
-                            }
+//                            String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
+//                            Integer id = user().get(ItemRewriter.class).getItems().get(tag);
+//                            if (id != null) {
+//                                ingredients.add(id);
+//                            }
                         }
                     });
 
@@ -95,21 +95,15 @@ public class CraftingDataTracker extends StoredObject {
                             }
                             case INVALID -> ingredients.add(-1);
                             case ITEM_TAG -> {
-                                String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
-                                Integer id = user().get(ItemRewriter.class).getItems().get(tag);
-                                if (id != null) {
-                                    ingredients.add(id);
-                                }
+//                                String tag = ((ItemDescriptor.ItemTagDescriptor) descriptor).itemTag();
+//                                Integer id = user().get(ItemRewriter.class).getItems().get(tag);
+//                                if (id != null) {
+//                                    ingredients.add(id);
+//                                }
                             }
                         }
                     }
 
-                    final List<String> debug = new ArrayList<>();
-                    for (int i : ingredients) {
-                        debug.add(user().get(ItemRewriter.class).getItems().inverse().get(i));
-                    }
-
-                    String name = user().get(ItemRewriter.class).getItems().inverse().get(shapedRecipe.getResults().get(0).identifier());
                     recipeMap.put(ingredients.hashCode(), storage);
                 }
             }
