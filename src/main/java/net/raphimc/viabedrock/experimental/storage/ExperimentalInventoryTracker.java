@@ -21,8 +21,12 @@ import com.viaversion.viaversion.api.connection.StoredObject;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.util.PacketFactory;
+import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.experimental.model.container.dynamic.BundleContainer;
+import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
+import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
+import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.experimental.model.container.player.ArmorContainer;
 import net.raphimc.viabedrock.experimental.model.container.player.HudContainer;
 import net.raphimc.viabedrock.experimental.model.container.player.InventoryContainer;
@@ -31,6 +35,7 @@ import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.model.Position3f;
@@ -39,7 +44,9 @@ import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
@@ -139,12 +146,97 @@ public class ExperimentalInventoryTracker extends StoredObject {
     }
 
     public void setCurrentContainerClosed(final boolean serverInitiated) {
-        if (serverInitiated) {
-            PacketFactory.sendBedrockContainerClose(this.user(), this.currentContainer.containerId(), ContainerType.NONE);
+        final ExperimentalContainer closingContainer = this.currentContainer != null ? this.currentContainer : this.pendingCloseContainer;
+        if (serverInitiated && closingContainer != null) {
+            PacketFactory.sendBedrockContainerClose(this.user(), closingContainer.containerId(), ContainerType.NONE);
         }
-        this.hudContainer.setItem(0, BedrockItem.empty()); // TODO: Drop cursor item if needed
+        this.returnCursorItem();
         this.currentContainer = null;
         this.pendingCloseContainer = null;
+    }
+
+    private void returnCursorItem() {
+        final BedrockItem cursorItem = this.hudContainer.getItem(0);
+        if (cursorItem.isEmpty()) {
+            return;
+        }
+
+        final InventoryRequestTracker inventoryRequestTracker = this.user().get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
+        final ExperimentalContainer previousInventory = this.inventoryContainer.copy();
+        final ExperimentalContainer previousCursor = this.hudContainer.copy();
+
+        BedrockItem remaining = cursorItem.copy();
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot = this.inventoryContainer.size() - 1; slot >= 0 && !remaining.isEmpty(); slot--) {
+                final BedrockItem destinationItem = this.inventoryContainer.getItem(slot);
+                final int maxStackSize = this.user().get(ItemRewriter.class).maxStackSize(cursorItem);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(cursorItem) || destinationItem.amount() >= maxStackSize) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining.amount(), maxStackSize - destinationItem.amount())
+                        : Math.min(remaining.amount(), maxStackSize);
+                if (amountToMove <= 0) {
+                    continue;
+                }
+
+                actions.add(new ItemStackRequestAction.PlaceAction(
+                        amountToMove,
+                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(cursorItem)),
+                        new ItemStackRequestSlotInfo(this.inventoryContainer.getFullContainerName(slot), (byte) slot, this.stackNetId(destinationItem))
+                ));
+
+                if (destinationItem.isEmpty()) {
+                    final BedrockItem newDestinationItem = cursorItem.copy();
+                    newDestinationItem.setAmount(amountToMove);
+                    this.inventoryContainer.setItem(slot, newDestinationItem);
+                } else {
+                    final BedrockItem newDestinationItem = destinationItem.copy();
+                    newDestinationItem.setAmount(destinationItem.amount() + amountToMove);
+                    this.inventoryContainer.setItem(slot, newDestinationItem);
+                }
+                remaining = this.itemAfterRemovingAmount(remaining, amountToMove);
+            }
+        }
+
+        if (!remaining.isEmpty()) {
+            actions.add(new ItemStackRequestAction.DropAction(
+                    remaining.amount(),
+                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(cursorItem)),
+                    false
+            ));
+        }
+
+        this.hudContainer.setItem(0, BedrockItem.empty());
+        if (actions.isEmpty()) {
+            return;
+        }
+
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, 0, previousCursor, List.of(previousInventory)));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(this.user(), new ItemStackRequestInfo[]{request});
+        ExperimentalPacketFactory.sendJavaContainerSetContent(this.user(), this.inventoryContainer);
+    }
+
+    private int stackNetId(final BedrockItem item) {
+        return item.netId() != null ? item.netId() : 0;
+    }
+
+    private BedrockItem itemAfterRemovingAmount(final BedrockItem item, final int amountToRemove) {
+        if (amountToRemove >= item.amount()) {
+            return BedrockItem.empty();
+        }
+
+        final BedrockItem copy = item.copy();
+        copy.setAmount(item.amount() - amountToRemove);
+        return copy;
     }
 
     public void tick() {

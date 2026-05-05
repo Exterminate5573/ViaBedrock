@@ -124,6 +124,11 @@ public class SmithingContainer extends ExperimentalContainer {
     }
 
     @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
+    }
+
+    @Override
     public boolean handleClick(int revision, short javaSlot, byte button, ContainerInput action) {
         boolean result = false;
         if (javaSlot != 3) {
@@ -271,7 +276,8 @@ public class SmithingContainer extends ExperimentalContainer {
         }
     }
 
-    private int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
+    @Override
+    protected int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
         int capacity = 0;
         for (int slot = inventory.size() - 1; slot >= 0; slot--) {
             final BedrockItem item = inventory.getItem(slot);

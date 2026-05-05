@@ -24,6 +24,7 @@ import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class BrewingStandContainer extends ExperimentalContainer {
@@ -68,6 +69,27 @@ public class BrewingStandContainer extends ExperimentalContainer {
             case 0 -> 0; // Progress arrow
             case 1 -> 1; // Fuel progress
             default -> -1; // Unknown
+        };
+    }
+
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot >= 1 && bedrockSlot <= 3) {
+            return 1;
+        }
+        return super.maxStackSizeForSlot(bedrockSlot, item);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 0 -> this.isItem(item, "minecraft:blaze_powder");
+            case 1, 2, 3 -> this.isBrewingBottle(item);
+            case 4 -> !this.isItem(item, "minecraft:blaze_powder") && !this.isBrewingBottle(item);
+            default -> false;
         };
     }
 }

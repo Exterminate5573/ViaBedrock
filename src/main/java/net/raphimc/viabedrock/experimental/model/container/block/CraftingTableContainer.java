@@ -100,6 +100,11 @@ public class CraftingTableContainer extends ExperimentalContainer {
     }
 
     @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
+    }
+
+    @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (!ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
             return super.handleClick(revision, javaSlot, button, action);
@@ -171,6 +176,9 @@ public class CraftingTableContainer extends ExperimentalContainer {
         final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
         final int requestId = inventoryRequestTracker.nextRequestId();
         final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, 1, requestId);
+        if (!this.remaindersFit(recipeMatch.ingredients(), inventoryTracker, 1)) {
+            return false;
+        }
         actions.add(new ItemStackRequestAction.TakeAction(
                 resultItem.amount(),
                 new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
@@ -206,8 +214,12 @@ public class CraftingTableContainer extends ExperimentalContainer {
         }
 
         final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
-        final int crafts = Math.min(maxCrafts, this.craftsThatFit(inventoryTracker.getInventoryContainer(), resultItem, maxCrafts));
+        final int craftLimit = this.hasCraftingRemainders(recipeMatch.ingredients()) ? 1 : maxCrafts;
+        final int crafts = Math.min(craftLimit, this.craftsThatFit(inventoryTracker.getInventoryContainer(), resultItem, craftLimit));
         if (crafts <= 0) {
+            return false;
+        }
+        if (!this.remaindersFit(recipeMatch.ingredients(), inventoryTracker, crafts)) {
             return false;
         }
 
@@ -245,6 +257,12 @@ public class CraftingTableContainer extends ExperimentalContainer {
                         ingredient.count() * crafts,
                         new ItemStackRequestSlotInfo(this.getFullContainerName(inputSlot), (byte) inputSlot, item.netId() != null ? item.netId() : 0)
                 ));
+            }
+        }
+        for (CraftingDataTracker.IngredientUse ingredient : recipeMatch.ingredients()) {
+            final int inputSlot = ingredient.bedrockSlot();
+            if (!this.craftingRemainder(this.getItem(inputSlot)).isEmpty()) {
+                actions.add(new ItemStackRequestAction.CreateAction(inputSlot));
             }
         }
         return actions;
@@ -305,6 +323,39 @@ public class CraftingTableContainer extends ExperimentalContainer {
             }
         }
         return maxCrafts == Integer.MAX_VALUE ? 0 : maxCrafts;
+    }
+
+    private boolean hasCraftingRemainders(final List<CraftingDataTracker.IngredientUse> ingredients) {
+        for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+            if (!this.craftingRemainder(this.getItem(ingredient.bedrockSlot())).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean remaindersFit(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalInventoryTracker inventoryTracker, final int crafts) {
+        final ExperimentalContainer inventoryCopy = inventoryTracker.getInventoryContainer().copy();
+        for (int craft = 0; craft < crafts; craft++) {
+            for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+                for (int i = 0; i < ingredient.count(); i++) {
+                    final BedrockItem item = this.getItem(ingredient.bedrockSlot());
+                    final BedrockItem remainder = this.craftingRemainder(item);
+                    if (remainder.isEmpty()) {
+                        continue;
+                    }
+
+                    final BedrockItem newItem = this.itemAfterRemovingAmount(item, 1);
+                    if (newItem.isEmpty() || !newItem.isDifferent(remainder) && newItem.amount() < this.maxStackSize(newItem)) {
+                        continue;
+                    }
+                    if (this.addToInventory(inventoryCopy, remainder, remainder.amount(), true) != remainder.amount()) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private void consumeIngredients(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalInventoryTracker inventoryTracker, final int crafts) {

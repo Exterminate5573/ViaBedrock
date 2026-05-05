@@ -21,10 +21,14 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+
+import java.util.List;
 
 public class CartographyContainer extends ExperimentalContainer {
 
@@ -79,6 +83,33 @@ public class CartographyContainer extends ExperimentalContainer {
             case 13 -> super.setItem(1, item);
             case 50 -> super.setItem(2, item);
             default -> throw new IllegalArgumentException("Invalid slot for Cartography Container: " + bedrockSlot);
+        };
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (javaSlot == 2) {
+            return this.handleCreatedOutputClick(
+                    revision,
+                    action,
+                    this.getItem(50),
+                    List.of(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)),
+                    List.of(new ResultIngredient(12, 1, false), new ResultIngredient(13, 1))
+            );
+        }
+        return super.handleClick(revision, javaSlot, button, action);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 12 -> this.isItem(item, "minecraft:filled_map") || item.tag() != null && item.tag().contains("map_uuid");
+            case 13 -> this.isAnyItem(item, "minecraft:paper", "minecraft:empty_map", "minecraft:glass_pane");
+            case 50 -> false;
+            default -> false;
         };
     }
 

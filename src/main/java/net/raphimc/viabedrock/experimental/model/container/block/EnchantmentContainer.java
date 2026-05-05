@@ -110,6 +110,10 @@ public class EnchantmentContainer extends ExperimentalContainer {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received invalid enchantment option button click: " + button);
             return false;
         }
+        final EnchantData enchantData = this.data.get(button);
+        if (!enchantData.isValid()) {
+            return false;
+        }
 
         ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
@@ -121,7 +125,7 @@ public class EnchantmentContainer extends ExperimentalContainer {
         if (inputItem.isEmpty()) {
             return false;
         }
-        if (survivalLike && materialItem.amount() < materialCost) {
+        if (survivalLike && (!this.isItem(materialItem, "minecraft:lapis_lazuli") || materialItem.amount() < materialCost)) {
             return false;
         }
 
@@ -131,11 +135,11 @@ public class EnchantmentContainer extends ExperimentalContainer {
         prevContainers.add(this.copy());
 
         int reqId = inventoryRequestTracker.nextRequestId();
-        final BedrockItem resultItem = this.enchantedResult(inputItem, this.data.get(button));
+        final BedrockItem resultItem = this.enchantedResult(inputItem, enchantData);
 
         List<ItemStackRequestAction> actions = new ArrayList<>();
 
-        ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(this.data.get(button).netId(), 1);
+        ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(enchantData.netId(), 1);
         ItemStackRequestAction craftResultsAction = new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1);
         ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
                 this.getFullContainerName(14), (byte) 14, this.stackNetId(inputItem)
@@ -199,10 +203,12 @@ public class EnchantmentContainer extends ExperimentalContainer {
             tag.put("ench", enchantments);
         }
 
-        final CompoundTag enchantment = new CompoundTag();
-        enchantment.put("id", new ShortTag((short) enchantData.type().getValue()));
-        enchantment.put("lvl", new ShortTag((short) enchantData.level()));
-        enchantments.add(enchantment);
+        for (EnchantData.Enchantment data : enchantData.enchantments()) {
+            final CompoundTag enchantment = new CompoundTag();
+            enchantment.put("id", new ShortTag((short) data.type().getValue()));
+            enchantment.put("lvl", new ShortTag((short) data.level()));
+            enchantments.add(enchantment);
+        }
         resultItem.setTag(tag);
         return resultItem;
     }
@@ -211,9 +217,14 @@ public class EnchantmentContainer extends ExperimentalContainer {
         this.data = data;
 
         // Send to java client
-        for (int i = 0; i < Math.min(this.data.size(), 3); i++) {
-            EnchantData d = this.data.get(i);
-            ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) d.cost());
+        for (int i = 0; i < 3; i++) {
+            final EnchantData d = i < this.data.size() ? this.data.get(i) : null;
+            ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) (d != null ? d.cost() : 0));
+            if (d == null || !d.isValid() || d.type() == null) {
+                ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 4), (short) -1);
+                ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) -1);
+                continue;
+            }
 
             String javaEnchant = BedrockProtocol.MAPPINGS.getBedrockToJavaEnchantments().get(d.type());
             // Update the java item with the enchantment
@@ -233,6 +244,18 @@ public class EnchantmentContainer extends ExperimentalContainer {
             ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) d.level());
         }
 
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 14 -> !this.isItem(item, "minecraft:lapis_lazuli");
+            case 15 -> this.isItem(item, "minecraft:lapis_lazuli");
+            default -> false;
+        };
     }
 
 }

@@ -39,7 +39,6 @@ import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
-import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -111,6 +110,11 @@ public class AnvilContainer extends ExperimentalContainer {
         }
 
         return super.setItems(items);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
     }
 
     @Override
@@ -254,10 +258,6 @@ public class AnvilContainer extends ExperimentalContainer {
         return 0;
     }
 
-    private String itemIdentifier(final BedrockItem item) {
-        return this.user.get(ItemRewriter.class).getItems().inverse().get(item.identifier());
-    }
-
     private int maxDamage(final String identifier) {
         final String item = identifier.startsWith("minecraft:") ? identifier.substring("minecraft:".length()) : identifier;
         return switch (item) {
@@ -339,7 +339,8 @@ public class AnvilContainer extends ExperimentalContainer {
         }
     }
 
-    private int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
+    @Override
+    protected int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
         int capacity = 0;
         for (int slot = inventory.size() - 1; slot >= 0; slot--) {
             final BedrockItem item = inventory.getItem(slot);

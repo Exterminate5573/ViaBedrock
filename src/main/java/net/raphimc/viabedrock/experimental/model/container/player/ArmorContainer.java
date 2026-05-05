@@ -21,6 +21,7 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class ArmorContainer extends InventorySubContainer {
@@ -42,6 +43,26 @@ public class ArmorContainer extends InventorySubContainer {
     @Override
     public int bedrockSlot(final int slot) {
         return slot - 5;
+    }
+
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        return 1;
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+
+        return switch (bedrockSlot) {
+            case 0 -> this.itemNameEndsWith(item, "_helmet") || this.itemNameEndsWith(item, "_head") || this.isItem(item, "minecraft:carved_pumpkin");
+            case 1 -> this.itemNameEndsWith(item, "_chestplate") || this.isItem(item, "minecraft:elytra");
+            case 2 -> this.itemNameEndsWith(item, "_leggings");
+            case 3 -> this.itemNameEndsWith(item, "_boots");
+            default -> false;
+        };
     }
 
 }

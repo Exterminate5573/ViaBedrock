@@ -926,6 +926,13 @@ public class ExperimentalFeatures {
                             }
                             continue;
                         }
+                        if (slotInfo.amount() == 0) {
+                            container.setItem(bedrockSlot, BedrockItem.empty());
+                            if (container.getFullContainerName(bedrockSlot).name() != ContainerEnumName.CursorContainer) {
+                                mismatchedContainers.add(container);
+                            }
+                            continue;
+                        }
                         final BedrockItem newItem = expectedItem.copy();
                         applyItemStackResponse(newItem, slotInfo);
                         if (!newItem.equals(expectedItem)) {
@@ -991,18 +998,15 @@ public class ExperimentalFeatures {
                 final int cost = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // cost
                 wrapper.read(BedrockTypes.INT_LE); // slot
 
-                // TODO: How does bedrock decide on what to show
-                Enchant_Type selected = null;
-                int level = -1;
+                final List<EnchantData.Enchantment> enchantments = new ArrayList<>();
 
                 final int l1 = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // size
                 for (int j = 0; j < l1; j++) {
                     final byte id = wrapper.read(Types.BYTE); // enchant id
                     final byte lvl = wrapper.read(Types.BYTE); // enchant level
-
-                    if (selected == null) {
-                        selected = Enchant_Type.getByValue(id);
-                        level = lvl;
+                    final Enchant_Type enchantment = Enchant_Type.getByValue(Byte.toUnsignedInt(id));
+                    if (enchantment != null && Byte.toUnsignedInt(lvl) > 0) {
+                        enchantments.add(new EnchantData.Enchantment(enchantment, Byte.toUnsignedInt(lvl)));
                     }
                 }
 
@@ -1010,10 +1014,9 @@ public class ExperimentalFeatures {
                 for (int j = 0; j < l2; j++) {
                     final byte id = wrapper.read(Types.BYTE); // enchant id
                     final byte lvl = wrapper.read(Types.BYTE); // enchant level
-
-                    if (selected == null) {
-                        selected = Enchant_Type.getByValue(id);
-                        level = lvl;
+                    final Enchant_Type enchantment = Enchant_Type.getByValue(Byte.toUnsignedInt(id));
+                    if (enchantment != null && Byte.toUnsignedInt(lvl) > 0) {
+                        enchantments.add(new EnchantData.Enchantment(enchantment, Byte.toUnsignedInt(lvl)));
                     }
                 }
 
@@ -1021,17 +1024,16 @@ public class ExperimentalFeatures {
                 for (int j = 0; j < l3; j++) {
                     final byte id = wrapper.read(Types.BYTE); // enchant id
                     final byte lvl = wrapper.read(Types.BYTE); // enchant level
-
-                    if (selected == null) {
-                        selected = Enchant_Type.getByValue(id);
-                        level = lvl;
+                    final Enchant_Type enchantment = Enchant_Type.getByValue(Byte.toUnsignedInt(id));
+                    if (enchantment != null && Byte.toUnsignedInt(lvl) > 0) {
+                        enchantments.add(new EnchantData.Enchantment(enchantment, Byte.toUnsignedInt(lvl)));
                     }
                 }
 
                 wrapper.read(BedrockTypes.STRING); // Name
                 final int netId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // Enchant Net Id
 
-                data.add(new EnchantData(cost, selected, level, netId));
+                data.add(new EnchantData(cost, enchantments, netId));
             }
 
             enchantmentContainer.setEnchantData(data);

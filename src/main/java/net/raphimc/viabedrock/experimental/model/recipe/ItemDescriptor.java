@@ -26,7 +26,9 @@ import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,6 +57,43 @@ public interface ItemDescriptor {
         final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
         final Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(itemName);
         return tags == null ? Set.of() : tags;
+    }
+
+    static boolean writeFirstMatchingJavaItemData(final PacketWrapper packet, final UserConnection user, final Predicate<BedrockItem> predicate) {
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        for (Map.Entry<String, Integer> entry : itemRewriter.getItems().entrySet()) {
+            final BedrockItem item = new BedrockItem(entry.getValue());
+            if (!predicate.test(item)) {
+                continue;
+            }
+
+            if (writeJavaItemData(packet, itemRewriter, item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean writeFirstNamedJavaItemData(final PacketWrapper packet, final UserConnection user, final Set<String> names) {
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        for (String name : names) {
+            final Integer itemId = itemRewriter.getItems().get(Key.namespaced(name));
+            if (itemId != null && writeJavaItemData(packet, itemRewriter, new BedrockItem(itemId))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean writeJavaItemData(final PacketWrapper packet, final ItemRewriter itemRewriter, final BedrockItem bedrockItem) {
+        final Item javaItem = itemRewriter.javaItem(bedrockItem);
+        if (javaItem == null || javaItem.isEmpty()) {
+            return false;
+        }
+
+        packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
+        packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
+        return true;
     }
 
     default void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
@@ -87,18 +126,15 @@ public interface ItemDescriptor {
             final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
             final Integer itemId = itemRewriter.getItems().get(Key.namespaced(name));
             if (itemId == null) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                if (!ItemDescriptor.writeFirstMatchingJavaItemData(packet, user, item -> ItemDescriptor.itemTags(user, item).contains(name))) {
+                    packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                }
                 return;
             }
 
-            final Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
-            if (javaItem == null) {
+            if (!ItemDescriptor.writeJavaItemData(packet, itemRewriter, new BedrockItem(itemId))) {
                 packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
-                return;
             }
-
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
-            packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
         }
 
         @Override
@@ -230,9 +266,9 @@ public interface ItemDescriptor {
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:tag")); // Slot Display Type
-            //TODO: Convert to Java Tag properly
-            packet.write(Types.IDENTIFIER, Key.of(itemTag)); // Item Tag
+            if (!ItemDescriptor.writeFirstMatchingJavaItemData(packet, user, item -> ItemDescriptor.itemTags(user, item).contains(itemTag))) {
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+            }
         }
 
         @Override
@@ -293,6 +329,17 @@ public interface ItemDescriptor {
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
+            final Matcher itemNameAny = ITEM_NAME_ANY.matcher(tagExpression);
+            if (itemNameAny.find() && ItemDescriptor.writeFirstNamedJavaItemData(packet, user, readArguments(itemNameAny.group(1)))) {
+                return;
+            }
+
+            final Matcher anyTag = ANY_TAG.matcher(tagExpression);
+            final Matcher allTags = ALL_TAGS.matcher(tagExpression);
+            if ((anyTag.find() || allTags.find()) && ItemDescriptor.writeFirstMatchingJavaItemData(packet, user, item -> this.matchesItem(user, item))) {
+                return;
+            }
+
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
         }
 

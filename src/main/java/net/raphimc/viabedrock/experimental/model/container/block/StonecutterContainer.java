@@ -108,6 +108,11 @@ public class StonecutterContainer extends ExperimentalContainer {
     }
 
     @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot == 3;
+    }
+
+    @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         boolean result = false;
         if (javaSlot != 1) {

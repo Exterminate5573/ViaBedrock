@@ -21,11 +21,16 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class GrindstoneContainer extends ExperimentalContainer {
 
@@ -78,6 +83,42 @@ public class GrindstoneContainer extends ExperimentalContainer {
         return switch (bedrockSlot) {
             case 50 -> super.setItem(2, item);
             default -> super.setItem(bedrockSlot - 16, item);
+        };
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (javaSlot == 2) {
+            final BedrockItem resultItem = this.getItem(50);
+            final List<ResultIngredient> ingredients = new ArrayList<>(2);
+            final BedrockItem inputItem = this.getItem(16);
+            final BedrockItem additionalItem = this.getItem(17);
+            if (!inputItem.isEmpty()) {
+                ingredients.add(new ResultIngredient(16, inputItem.amount()));
+            }
+            if (!additionalItem.isEmpty()) {
+                ingredients.add(new ResultIngredient(17, additionalItem.amount()));
+            }
+            return this.handleCreatedOutputClick(
+                    revision,
+                    action,
+                    resultItem,
+                    List.of(new ItemStackRequestAction.CraftGrindstoneAction(0, 1, 0)),
+                    ingredients
+            );
+        }
+        return super.handleClick(revision, javaSlot, button, action);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 16, 17 -> this.isDamageableItem(item) || this.hasEnchantmentTag(item);
+            case 50 -> false;
+            default -> false;
         };
     }
 

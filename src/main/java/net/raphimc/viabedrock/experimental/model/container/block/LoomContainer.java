@@ -17,14 +17,21 @@
  */
 package net.raphimc.viabedrock.experimental.model.container.block;
 
+import com.viaversion.nbt.tag.CompoundTag;
+import com.viaversion.nbt.tag.ListTag;
+import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+
+import java.util.List;
 
 public class LoomContainer extends ExperimentalContainer {
 
@@ -85,6 +92,61 @@ public class LoomContainer extends ExperimentalContainer {
             case 50 -> super.setItem(3, item);
             default -> throw new IllegalArgumentException("Invalid slot for Loom Container: " + bedrockSlot);
         };
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (javaSlot == 3) {
+            final BedrockItem resultItem = this.getItem(50);
+            final String patternId = this.patternId(resultItem);
+            if (patternId == null) {
+                return false;
+            }
+            return this.handleCreatedOutputClick(
+                    revision,
+                    action,
+                    resultItem,
+                    List.of(new ItemStackRequestAction.CraftLoomAction(patternId, 1)),
+                    List.of(new ResultIngredient(9, 1), new ResultIngredient(10, 1))
+            );
+        }
+        return super.handleClick(revision, javaSlot, button, action);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 9 -> this.itemNameEndsWith(item, "_banner") || this.isItem(item, "minecraft:banner");
+            case 10 -> this.itemNameEndsWith(item, "_dye");
+            case 11 -> this.itemNameEndsWith(item, "_banner_pattern");
+            case 50 -> false;
+            default -> false;
+        };
+    }
+
+    @Override
+    protected BedrockItem createdOutputAfterTake(final BedrockItem resultItem) {
+        return !this.getItem(9).isEmpty() && !this.getItem(10).isEmpty() ? resultItem.copy() : BedrockItem.empty();
+    }
+
+    private String patternId(final BedrockItem resultItem) {
+        if (resultItem.tag() == null) {
+            return null;
+        }
+
+        final ListTag<CompoundTag> patterns = resultItem.tag().getListTag("Patterns", CompoundTag.class);
+        if (patterns == null || patterns.isEmpty()) {
+            return null;
+        }
+
+        final CompoundTag lastPattern = patterns.get(patterns.size() - 1);
+        if (lastPattern.get("Pattern") instanceof StringTag patternTag) {
+            return patternTag.getValue();
+        }
+        return null;
     }
 
 }

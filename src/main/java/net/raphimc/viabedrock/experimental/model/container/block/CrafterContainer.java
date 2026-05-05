@@ -96,6 +96,11 @@ public class CrafterContainer extends ExperimentalContainer {
     }
 
     @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
+    }
+
+    @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 45) {
             return false;

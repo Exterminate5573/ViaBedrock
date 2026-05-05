@@ -199,6 +199,9 @@ public class InventoryContainer extends ExperimentalContainer {
         final InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
         final int requestId = inventoryRequestTracker.nextRequestId();
         final List<ItemStackRequestAction> actions = this.craftActions(inventoryTracker, recipeMatch, resultItem, 1, requestId);
+        if (!this.remaindersFit(inventoryTracker, recipeMatch.ingredients(), 1)) {
+            return false;
+        }
         actions.add(new ItemStackRequestAction.TakeAction(
                 resultItem.amount(),
                 new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
@@ -225,8 +228,12 @@ public class InventoryContainer extends ExperimentalContainer {
             return false;
         }
 
-        final int crafts = Math.min(maxCrafts, this.craftsThatFit(resultItem, maxCrafts));
+        final int craftLimit = this.hasCraftingRemainders(inventoryTracker, recipeMatch.ingredients()) ? 1 : maxCrafts;
+        final int crafts = Math.min(craftLimit, this.craftsThatFit(resultItem, craftLimit));
         if (crafts <= 0) {
+            return false;
+        }
+        if (!this.remaindersFit(inventoryTracker, recipeMatch.ingredients(), crafts)) {
             return false;
         }
 
@@ -264,6 +271,12 @@ public class InventoryContainer extends ExperimentalContainer {
                         ingredient.count() * crafts,
                         new ItemStackRequestSlotInfo(inventoryTracker.getHudContainer().getFullContainerName(inputSlot), (byte) inputSlot, item.netId() != null ? item.netId() : 0)
                 ));
+            }
+        }
+        for (CraftingDataTracker.IngredientUse ingredient : recipeMatch.ingredients()) {
+            final int inputSlot = ingredient.bedrockSlot();
+            if (!this.craftingRemainder(inventoryTracker.getHudContainer().getItem(inputSlot)).isEmpty()) {
+                actions.add(new ItemStackRequestAction.CreateAction(inputSlot));
             }
         }
         return actions;
@@ -324,6 +337,39 @@ public class InventoryContainer extends ExperimentalContainer {
             }
         }
         return maxCrafts == Integer.MAX_VALUE ? 0 : maxCrafts;
+    }
+
+    private boolean hasCraftingRemainders(final ExperimentalInventoryTracker inventoryTracker, final List<CraftingDataTracker.IngredientUse> ingredients) {
+        for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+            if (!this.craftingRemainder(inventoryTracker.getHudContainer().getItem(ingredient.bedrockSlot())).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean remaindersFit(final ExperimentalInventoryTracker inventoryTracker, final List<CraftingDataTracker.IngredientUse> ingredients, final int crafts) {
+        final ExperimentalContainer inventoryCopy = this.copy();
+        for (int craft = 0; craft < crafts; craft++) {
+            for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+                for (int i = 0; i < ingredient.count(); i++) {
+                    final BedrockItem item = inventoryTracker.getHudContainer().getItem(ingredient.bedrockSlot());
+                    final BedrockItem remainder = this.craftingRemainder(item);
+                    if (remainder.isEmpty()) {
+                        continue;
+                    }
+
+                    final BedrockItem newItem = this.itemAfterRemovingAmount(item, 1);
+                    if (newItem.isEmpty() || !newItem.isDifferent(remainder) && newItem.amount() < this.maxStackSize(newItem)) {
+                        continue;
+                    }
+                    if (this.addToInventory(inventoryCopy, remainder, remainder.amount(), true) != remainder.amount()) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private void consumeIngredients(final ExperimentalInventoryTracker inventoryTracker, final List<CraftingDataTracker.IngredientUse> ingredients, final int crafts) {

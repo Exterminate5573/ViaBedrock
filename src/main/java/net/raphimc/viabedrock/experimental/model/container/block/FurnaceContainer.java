@@ -24,6 +24,7 @@ import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class FurnaceContainer extends ExperimentalContainer {
@@ -59,6 +60,27 @@ public class FurnaceContainer extends ExperimentalContainer {
             case 2 -> 1; // Max fuel progress
             case 3 -> 3; // Max progress arrow
             default -> -1; // Unknown
+        };
+    }
+
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot == 1 && this.isItem(item, "minecraft:bucket")) {
+            return 1;
+        }
+        return super.maxStackSizeForSlot(bedrockSlot, item);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 0 -> true;
+            case 1 -> this.isFurnaceFuel(item) || this.isItem(item, "minecraft:bucket");
+            case 2 -> false;
+            default -> false;
         };
     }
 
