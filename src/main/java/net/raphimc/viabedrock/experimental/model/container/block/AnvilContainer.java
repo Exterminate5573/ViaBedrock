@@ -151,8 +151,15 @@ public class AnvilContainer extends ExperimentalContainer {
 
             final int requestId = inventoryRequestTracker.nextRequestId();
             final int materialConsumeCount = this.materialConsumeCount(inputItem, materialItem, resultItem);
+            final List<String> filterStrings = new ArrayList<>();
+            TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
+            if (!this.getRenameText().isEmpty()) {
+                filterStrings.add(this.getRenameText());
+                origin = TextProcessingEventOrigin.AnvilText;
+            }
+
             final List<ItemStackRequestAction> actions = new ArrayList<>();
-            actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0));
+            actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, filterStrings.isEmpty() ? -1 : 0));
             if (materialConsumeCount > 0) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(materialConsumeCount, new ItemStackRequestSlotInfo(
                         new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
@@ -167,7 +174,7 @@ public class AnvilContainer extends ExperimentalContainer {
             )));
 
             if (action == ContainerInput.PICKUP) {
-                actions.add(new ItemStackRequestAction.PlaceAction(
+                actions.add(new ItemStackRequestAction.TakeAction(
                         resultItem.amount(),
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
@@ -175,14 +182,7 @@ public class AnvilContainer extends ExperimentalContainer {
             } else if (action == ContainerInput.QUICK_MOVE) {
                 this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
             } else {
-                actions.add(this.placeCreatedOutputAction(resultItem, requestId, swapDestination));
-            }
-
-            final List<String> filterStrings = new ArrayList<>();
-            TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
-            if (!this.getRenameText().isEmpty()) {
-                filterStrings.add(this.getRenameText());
-                origin = TextProcessingEventOrigin.AnvilText;
+                actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
             }
 
             final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, filterStrings, origin);

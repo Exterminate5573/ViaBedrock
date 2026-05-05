@@ -982,9 +982,17 @@ public class ExperimentalFeatures {
 
             short javaId = container.translateContainerData(id);
             if (javaId == -1) {
+                if (container instanceof FurnaceContainer && id == 3) {
+                    wrapper.cancel();
+                    return;
+                }
                 ViaBedrock.getPlatform().getLogger().warning("Received ContainerSetData packet with unknown id: containerId=" + containerId + ", id=" + id + ", value=" + value);
                 wrapper.cancel();
                 return;
+            }
+
+            if (container instanceof FurnaceContainer && id == 0) {
+                ExperimentalPacketFactory.sendJavaContainerProperties(wrapper.user(), container, (short) 3, (short) 200);
             }
 
             wrapper.write(Types.VAR_INT, windowId);
