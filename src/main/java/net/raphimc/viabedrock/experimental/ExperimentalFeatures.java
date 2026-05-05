@@ -445,8 +445,14 @@ public class ExperimentalFeatures {
             }
 
             final BedrockItem bedrockItem = itemRewriter.bedrockItem(item);
-            final Integer creativeNetworkId = wrapper.user().get(CreativeContentStorage.class).creativeNetworkId(bedrockItem);
+            final CreativeContentStorage creativeContentStorage = wrapper.user().get(CreativeContentStorage.class);
+            final Integer creativeNetworkId = creativeContentStorage.creativeNetworkId(bedrockItem);
             if (bedrockItem.isEmpty() || creativeNetworkId == null) {
+                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                return;
+            }
+            final BedrockItem creativeResultTemplate = creativeContentStorage.creativeItem(creativeNetworkId);
+            if (creativeResultTemplate.isEmpty()) {
                 ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
                 return;
             }
@@ -454,7 +460,7 @@ public class ExperimentalFeatures {
             final int requestId = inventoryRequestTracker.nextRequestId();
             final List<ItemStackRequestAction> actions = new ArrayList<>();
             actions.add(new ItemStackRequestAction.CraftCreativeAction(creativeNetworkId, 1));
-            actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(bedrockItem), 1));
+            actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(creativeResultTemplate), 1));
 
             final List<ExperimentalContainer> prevContainers = new ArrayList<>();
             if (creativeSlot != null) {
@@ -937,8 +943,9 @@ public class ExperimentalFeatures {
                         final BedrockItem newItem = expectedItem.copy();
                         applyItemStackResponse(newItem, slotInfo);
                         if (!newItem.equals(expectedItem)) {
+                            final boolean itemContentChanged = !sameItemIgnoringNetId(newItem, expectedItem);
                             container.setItem(bedrockSlot, newItem);
-                            if (container.getFullContainerName(bedrockSlot).name() != ContainerEnumName.CursorContainer) {
+                            if (itemContentChanged && container.getFullContainerName(bedrockSlot).name() != ContainerEnumName.CursorContainer) {
                                 mismatchedContainers.add(container);
                             }
                         }
@@ -1337,6 +1344,14 @@ public class ExperimentalFeatures {
             }
             displayTag.putString("Name", customName);
         }
+    }
+
+    private static boolean sameItemIgnoringNetId(final BedrockItem first, final BedrockItem second) {
+        final BedrockItem firstCopy = first.copy();
+        final BedrockItem secondCopy = second.copy();
+        firstCopy.setNetId(null);
+        secondCopy.setNetId(null);
+        return firstCopy.equals(secondCopy);
     }
 
     private static CompoundTag itemTag(final BedrockItem item) {

@@ -43,6 +43,11 @@ public class CreativeContentStorage extends StoredObject {
         }
     }
 
+    public BedrockItem creativeItem(final int creativeNetworkId) {
+        final BedrockItem item = this.creativeItems.get(creativeNetworkId);
+        return item != null ? item.copy() : BedrockItem.empty();
+    }
+
     public Integer creativeNetworkId(final BedrockItem requestedItem) {
         if (requestedItem.isEmpty()) {
             return null;
