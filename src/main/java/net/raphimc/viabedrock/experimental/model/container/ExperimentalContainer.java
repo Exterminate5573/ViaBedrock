@@ -1233,4 +1233,8 @@ public abstract class ExperimentalContainer {
         ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "translateContainerData not implemented for container type: " + this.type);
         return -1;
     }
+
+    public int translateContainerDataValue(final int containerData, final int value) {
+        return value;
+    }
 }

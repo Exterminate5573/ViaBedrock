@@ -68,7 +68,17 @@ public class BrewingStandContainer extends ExperimentalContainer {
         return switch (containerData) {
             case 0 -> 0; // Progress arrow
             case 1 -> 1; // Fuel progress
+            case 2 -> -1; // Fuel total, Java has a fixed max of 20
             default -> -1; // Unknown
+        };
+    }
+
+    @Override
+    public int translateContainerDataValue(final int containerData, final int value) {
+        return switch (containerData) {
+            case 0 -> Math.max(0, Math.min(400, value));
+            case 1 -> Math.max(0, Math.min(20, value));
+            default -> value;
         };
     }
 

@@ -287,6 +287,9 @@ public class ItemRewriter extends StoredObject {
 
         final BedrockItem bedrockItem = mappedItem.copy();
         bedrockItem.setAmount(javaItem.amount());
+        if (ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
+            ExperimentalItemRewriter.handleJavaItem(javaItem, bedrockItem);
+        }
         return bedrockItem;
     }
 

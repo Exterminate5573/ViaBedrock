@@ -982,6 +982,10 @@ public class ExperimentalFeatures {
 
             short javaId = container.translateContainerData(id);
             if (javaId == -1) {
+                if (container instanceof BrewingStandContainer && id == 2) {
+                    wrapper.cancel();
+                    return;
+                }
                 if (container instanceof FurnaceContainer && id == 3) {
                     wrapper.cancel();
                     return;
@@ -997,7 +1001,7 @@ public class ExperimentalFeatures {
 
             wrapper.write(Types.VAR_INT, windowId);
             wrapper.write(Types.SHORT, javaId);
-            wrapper.write(Types.SHORT, (short) value);
+            wrapper.write(Types.SHORT, (short) container.translateContainerDataValue(id, value));
         });
         protocol.registerClientbound(ClientboundBedrockPackets.PLAYER_ENCHANT_OPTIONS, null, wrapper -> {
             wrapper.cancel();

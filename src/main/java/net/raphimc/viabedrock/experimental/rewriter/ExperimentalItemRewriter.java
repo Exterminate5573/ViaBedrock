@@ -23,6 +23,7 @@ import com.viaversion.viaversion.api.minecraft.data.StructuredData;
 import com.viaversion.viaversion.api.minecraft.data.StructuredDataKey;
 import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.api.minecraft.item.data.Enchantments;
+import com.viaversion.viaversion.libs.fastutil.ints.Int2IntMap;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.util.RegistryUtil;
 import net.raphimc.viabedrock.experimental.model.map.MapObject;
@@ -31,6 +32,7 @@ import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.Enchant_Type;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 
+import java.util.Map;
 import java.util.logging.Level;
 
 public class ExperimentalItemRewriter {
@@ -113,5 +115,80 @@ public class ExperimentalItemRewriter {
             }
 
         }
+    }
+
+    public static void handleJavaItem(final Item javaItem, final BedrockItem bedrockItem) {
+        if (javaItem == null || javaItem.isEmpty() || bedrockItem == null || bedrockItem.isEmpty()) {
+            return;
+        }
+
+        final Integer damage = javaItem.dataContainer().get(StructuredDataKey.DAMAGE);
+        if (damage != null && damage != 0) {
+            itemTag(bedrockItem).putInt("Damage", damage);
+        }
+
+        writeJavaEnchantments(bedrockItem, javaItem.dataContainer().get(StructuredDataKey.ENCHANTMENTS1_21_5));
+        writeJavaEnchantments(bedrockItem, javaItem.dataContainer().get(StructuredDataKey.STORED_ENCHANTMENTS1_21_5));
+    }
+
+    private static void writeJavaEnchantments(final BedrockItem bedrockItem, final Enchantments javaEnchantments) {
+        if (javaEnchantments == null || javaEnchantments.size() == 0) {
+            return;
+        }
+
+        final CompoundTag enchantmentsRegistry = (CompoundTag) BedrockProtocol.MAPPINGS.getJavaRegistries().get("minecraft:enchantment");
+        if (enchantmentsRegistry == null) {
+            return;
+        }
+
+        ListTag<CompoundTag> bedrockEnchantments = null;
+        for (Int2IntMap.Entry enchantment : javaEnchantments.enchantments().int2IntEntrySet()) {
+            final int level = enchantment.getIntValue();
+            if (level <= 0) {
+                continue;
+            }
+
+            final Enchant_Type bedrockEnchantment = bedrockEnchantment(enchantmentsRegistry, enchantment.getIntKey());
+            if (bedrockEnchantment == null) {
+                continue;
+            }
+
+            if (bedrockEnchantments == null) {
+                bedrockEnchantments = enchantmentsTag(bedrockItem);
+            }
+            final CompoundTag bedrockEnchantmentTag = new CompoundTag();
+            bedrockEnchantmentTag.put("id", new ShortTag((short) bedrockEnchantment.getValue()));
+            bedrockEnchantmentTag.put("lvl", new ShortTag((short) level));
+            bedrockEnchantments.add(bedrockEnchantmentTag);
+        }
+    }
+
+    private static Enchant_Type bedrockEnchantment(final CompoundTag enchantmentsRegistry, final int javaEnchantment) {
+        for (Map.Entry<Enchant_Type, String> enchantment : BedrockProtocol.MAPPINGS.getBedrockToJavaEnchantments().entrySet()) {
+            final CompoundTag enchantmentEntry = (CompoundTag) enchantmentsRegistry.get(enchantment.getValue());
+            if (enchantmentEntry != null && RegistryUtil.getRegistryIndex(enchantmentsRegistry, enchantmentEntry) == javaEnchantment) {
+                return enchantment.getKey();
+            }
+        }
+
+        return null;
+    }
+
+    private static ListTag<CompoundTag> enchantmentsTag(final BedrockItem bedrockItem) {
+        ListTag<CompoundTag> enchantments = itemTag(bedrockItem).getListTag("ench", CompoundTag.class);
+        if (enchantments == null) {
+            enchantments = new ListTag<>(CompoundTag.class);
+            bedrockItem.tag().put("ench", enchantments);
+        }
+
+        return enchantments;
+    }
+
+    private static CompoundTag itemTag(final BedrockItem bedrockItem) {
+        if (bedrockItem.tag() == null) {
+            bedrockItem.setTag(new CompoundTag());
+        }
+
+        return bedrockItem.tag();
     }
 }
