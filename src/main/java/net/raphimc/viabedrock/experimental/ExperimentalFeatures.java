@@ -867,13 +867,13 @@ public class ExperimentalFeatures {
             for (int i = 0; i < groupCount; i++) {
                 wrapper.read(BedrockTypes.INT_LE); // category
                 wrapper.read(BedrockTypes.STRING); // name
-                wrapper.read(itemRewriter.itemType()); // icon
+                wrapper.read(itemRewriter.itemInstanceType()); // icon
             }
 
             final int itemCount = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
             for (int i = 0; i < itemCount; i++) {
                 final int creativeNetworkId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
-                final BedrockItem creativeItem = wrapper.read(itemRewriter.itemType());
+                final BedrockItem creativeItem = wrapper.read(itemRewriter.itemInstanceType());
                 wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // group index
                 creativeContentStorage.addCreativeItem(creativeNetworkId, creativeItem);
             }
