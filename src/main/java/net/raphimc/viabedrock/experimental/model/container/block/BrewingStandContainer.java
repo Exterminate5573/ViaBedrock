@@ -36,9 +36,9 @@ public class BrewingStandContainer extends ExperimentalContainer {
     @Override
     public FullContainerName getFullContainerName(int slot) {
         return switch (slot) {
-            case 0 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
+            case 0 -> new FullContainerName(ContainerEnumName.BrewingStandInputContainer, null);
             case 1, 2, 3 -> new FullContainerName(ContainerEnumName.BrewingStandResultContainer, null);
-            case 4 -> new FullContainerName(ContainerEnumName.BrewingStandInputContainer, null);
+            case 4 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
             default -> throw new IllegalArgumentException("Invalid slot for Brewing Container: " + slot);
         };
     }
@@ -86,9 +86,9 @@ public class BrewingStandContainer extends ExperimentalContainer {
             return true;
         }
         return switch (bedrockSlot) {
-            case 0 -> this.isItem(item, "minecraft:blaze_powder");
+            case 0 -> !this.isItem(item, "minecraft:blaze_powder") && !this.isBrewingBottle(item);
             case 1, 2, 3 -> this.isBrewingBottle(item);
-            case 4 -> !this.isItem(item, "minecraft:blaze_powder") && !this.isBrewingBottle(item);
+            case 4 -> this.isItem(item, "minecraft:blaze_powder");
             default -> false;
         };
     }

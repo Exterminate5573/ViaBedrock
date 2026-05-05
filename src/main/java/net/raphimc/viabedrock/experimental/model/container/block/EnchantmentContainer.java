@@ -258,6 +258,14 @@ public class EnchantmentContainer extends ExperimentalContainer {
         };
     }
 
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot == 14) {
+            return 1;
+        }
+        return super.maxStackSizeForSlot(bedrockSlot, item);
+    }
+
 }
 
 //[13:32:53:879] [CLIENT BOUND] - PlayerEnchantOptionsPacket(options=[EnchantOptionData(cost=2, primarySlot=16, enchants0=[], enchants1=[EnchantData(type=9, level=1)], enchants2=[], enchantName=dry physical enchant , enchantNetId=3407), EnchantOptionData(cost=5, primarySlot=16, enchants0=[], enchants1=[EnchantData(type=10, level=1)], enchants2=[], enchantName=destroy beast enchant spirit , enchantNetId=3408), EnchantOptionData(cost=7, primarySlot=16, enchants0=[], enchants1=[], enchants2=[EnchantData(type=12, level=1)], enchantName=enchant towards snuff cube , enchantNetId=3409)])

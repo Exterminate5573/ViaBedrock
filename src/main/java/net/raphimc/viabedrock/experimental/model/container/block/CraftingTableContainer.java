@@ -121,6 +121,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
             return switch (action) {
                 case PICKUP -> this.craftToCursor(revision, resultItem, recipeMatch);
                 case QUICK_MOVE -> this.craftToInventory(revision, resultItem, recipeMatch);
+                case SWAP -> this.craftToSwapDestination(revision, resultItem, recipeMatch, button);
                 default -> false;
             };
         }
@@ -215,11 +216,8 @@ public class CraftingTableContainer extends ExperimentalContainer {
 
         final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         final int craftLimit = this.hasCraftingRemainders(recipeMatch.ingredients()) ? 1 : maxCrafts;
-        final int crafts = Math.min(craftLimit, this.craftsThatFit(inventoryTracker.getInventoryContainer(), resultItem, craftLimit));
+        final int crafts = this.craftsThatFit(inventoryTracker.getInventoryContainer(), resultItem, recipeMatch.ingredients(), craftLimit);
         if (crafts <= 0) {
-            return false;
-        }
-        if (!this.remaindersFit(recipeMatch.ingredients(), inventoryTracker, crafts)) {
             return false;
         }
 
@@ -241,6 +239,47 @@ public class CraftingTableContainer extends ExperimentalContainer {
         this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, crafts);
         this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+        return true;
+    }
+
+    private boolean craftToSwapDestination(final int revision, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch, final byte button) {
+        final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+        final SwapDestination swapDestination = this.resultSwapDestination(button, resultItem);
+        if (swapDestination == null) {
+            return false;
+        }
+
+        final ExperimentalContainer inventoryCopy = inventoryTracker.getInventoryContainer().copy();
+        if (swapDestination.container() == inventoryTracker.getInventoryContainer()) {
+            inventoryCopy.setItem(swapDestination.bedrockSlot(), resultItem.copy());
+        }
+        if (!this.remaindersFit(recipeMatch.ingredients(), inventoryCopy, 1)) {
+            return false;
+        }
+
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, 1, requestId);
+        actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
+
+        final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+        this.addPrevContainer(prevContainers, this);
+        this.addPrevContainer(prevContainers, inventoryTracker.getInventoryContainer());
+        this.addPrevContainer(prevContainers, swapDestination.container());
+        final ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
+
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
+
+        swapDestination.container().setItem(swapDestination.bedrockSlot(), resultItem.copy());
+        this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, 1);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+        if (swapDestination.container() != inventoryTracker.getInventoryContainer()) {
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, swapDestination.container());
+        }
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
         return true;
     }
@@ -271,7 +310,10 @@ public class CraftingTableContainer extends ExperimentalContainer {
     private void addInventoryTransferActions(final List<ItemStackRequestAction> actions, final ExperimentalContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
         int remaining = totalAmount;
         for (boolean mergePass : new boolean[]{true, false}) {
-            for (int slot = inventory.size() - 1; slot >= 0 && remaining > 0; slot--) {
+            for (int slot : this.inventorySlots(inventory, true)) {
+                if (remaining <= 0) {
+                    break;
+                }
                 final BedrockItem destinationItem = inventory.getItem(slot);
                 if (mergePass) {
                     if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
@@ -294,24 +336,18 @@ public class CraftingTableContainer extends ExperimentalContainer {
         }
     }
 
-    private int craftsThatFit(final ExperimentalContainer inventory, final BedrockItem resultItem, final int maxCrafts) {
-        int remainingResultItems = maxCrafts * resultItem.amount();
-        for (boolean mergePass : new boolean[]{true, false}) {
-            for (int slot = inventory.size() - 1; slot >= 0 && remainingResultItems > 0; slot--) {
-                final BedrockItem destinationItem = inventory.getItem(slot);
-                if (mergePass) {
-                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
-                        continue;
-                    }
-                    remainingResultItems -= this.maxStackSize(resultItem) - destinationItem.amount();
-                } else if (destinationItem.isEmpty()) {
-                    remainingResultItems -= this.maxStackSize(resultItem);
-                }
+    private int craftsThatFit(final ExperimentalContainer inventory, final BedrockItem resultItem, final List<CraftingDataTracker.IngredientUse> ingredients, final int maxCrafts) {
+        for (int crafts = maxCrafts; crafts > 0; crafts--) {
+            final ExperimentalContainer inventoryCopy = inventory.copy();
+            final int totalResultAmount = crafts * resultItem.amount();
+            if (this.addToInventory(inventoryCopy, resultItem, totalResultAmount, true) != totalResultAmount) {
+                continue;
+            }
+            if (this.remaindersFit(ingredients, inventoryCopy, crafts)) {
+                return crafts;
             }
         }
-
-        final int fittingResultItems = maxCrafts * resultItem.amount() - Math.max(remainingResultItems, 0);
-        return fittingResultItems / resultItem.amount();
+        return 0;
     }
 
     private int maxCrafts(final List<CraftingDataTracker.IngredientUse> ingredients) {
@@ -335,7 +371,10 @@ public class CraftingTableContainer extends ExperimentalContainer {
     }
 
     private boolean remaindersFit(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalInventoryTracker inventoryTracker, final int crafts) {
-        final ExperimentalContainer inventoryCopy = inventoryTracker.getInventoryContainer().copy();
+        return this.remaindersFit(ingredients, inventoryTracker.getInventoryContainer().copy(), crafts);
+    }
+
+    private boolean remaindersFit(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalContainer inventoryCopy, final int crafts) {
         for (int craft = 0; craft < crafts; craft++) {
             for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
                 for (int i = 0; i < ingredient.count(); i++) {

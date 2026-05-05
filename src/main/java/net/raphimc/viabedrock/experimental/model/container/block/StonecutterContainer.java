@@ -144,7 +144,7 @@ public class StonecutterContainer extends ExperimentalContainer {
         if (javaSlot != 1) {
             return result;
         }
-        if (action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE) {
+        if (action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE && action != ContainerInput.SWAP) {
             return false;
         }
 
@@ -153,8 +153,8 @@ public class StonecutterContainer extends ExperimentalContainer {
         InventoryContainer inventory = inventoryTracker.getInventoryContainer();
 
         List<ExperimentalContainer> prevContainers = new ArrayList<>();
-        prevContainers.add(this.copy());
-        prevContainers.add(inventory.copy());
+        this.addPrevContainer(prevContainers, this);
+        this.addPrevContainer(prevContainers, inventory);
         ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
         int nextRequestId = inventoryRequestTracker.nextRequestId();
@@ -162,6 +162,13 @@ public class StonecutterContainer extends ExperimentalContainer {
         BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
         if (action == ContainerInput.PICKUP && !cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
             return false;
+        }
+        final SwapDestination swapDestination = action == ContainerInput.SWAP ? this.resultSwapDestination(button, resultItem) : null;
+        if (action == ContainerInput.SWAP && swapDestination == null) {
+            return false;
+        }
+        if (swapDestination != null) {
+            this.addPrevContainer(prevContainers, swapDestination.container());
         }
 
         final int inputCost = this.inputCost(craftingDataStorage);
@@ -189,8 +196,10 @@ public class StonecutterContainer extends ExperimentalContainer {
                     new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, nextRequestId),
                     new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
             ));
-        } else {
+        } else if (action == ContainerInput.QUICK_MOVE) {
             this.addInventoryTransferActions(actions, inventory, resultItem, craftableAmount * resultItem.amount(), nextRequestId);
+        } else {
+            actions.add(this.takeCreatedOutputAction(resultItem, nextRequestId, swapDestination));
         }
 
         ItemStackRequestInfo request = new ItemStackRequestInfo(
@@ -211,9 +220,12 @@ public class StonecutterContainer extends ExperimentalContainer {
                 newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
                 inventoryTracker.getHudContainer().setItem(0, newCursorItem);
             }
-        } else {
+        } else if (action == ContainerInput.QUICK_MOVE) {
             this.addToInventory(inventory, resultItem, craftableAmount * resultItem.amount(), true);
             ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventory);
+        } else {
+            swapDestination.container().setItem(swapDestination.bedrockSlot(), resultItem.copy());
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, swapDestination.container());
         }
         this.setItem(3, this.itemAfterRemovingAmount(sourceItem, toConsume));
 
@@ -315,7 +327,10 @@ public class StonecutterContainer extends ExperimentalContainer {
     private void addInventoryTransferActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
         int remaining = totalAmount;
         for (boolean mergePass : new boolean[]{true, false}) {
-            for (int slot = inventory.size() - 1; slot >= 0 && remaining > 0; slot--) {
+            for (int slot : this.inventorySlots(inventory, true)) {
+                if (remaining <= 0) {
+                    break;
+                }
                 final BedrockItem destinationItem = inventory.getItem(slot);
                 if (mergePass) {
                     if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {

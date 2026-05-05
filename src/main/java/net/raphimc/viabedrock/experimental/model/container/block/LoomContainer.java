@@ -104,6 +104,7 @@ public class LoomContainer extends ExperimentalContainer {
             }
             return this.handleCreatedOutputClick(
                     revision,
+                    button,
                     action,
                     resultItem,
                     List.of(new ItemStackRequestAction.CraftLoomAction(patternId, 1)),

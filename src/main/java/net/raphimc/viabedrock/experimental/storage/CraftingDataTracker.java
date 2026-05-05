@@ -24,6 +24,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
@@ -47,6 +48,9 @@ public class CraftingDataTracker extends StoredObject {
     }
 
     public record RecipeMatch(CraftingDataStorage craftingData, List<IngredientUse> ingredients) {
+    }
+
+    private record StonecutterUpdateRecipe(List<Integer> inputJavaItemIds, Item javaOutput) {
     }
 
     public CraftingDataTracker(UserConnection user) {
@@ -243,28 +247,68 @@ public class CraftingDataTracker extends StoredObject {
 
         PacketWrapper packet = PacketWrapper.create(ClientboundPackets26_1.UPDATE_RECIPES, user);
         packet.write(Types.VAR_INT, 0); // Property Sets (Prefixed array) TODO: Sends registries e.g. furnace fuel, smithing template
-        List<CraftingDataStorage> stonecutterList = craftingDataList.stream()
-                .filter(c -> c.recipe().getRecipeTag().equals("stonecutter"))
-                .filter(c -> c.recipe() instanceof ShapelessRecipe)
-                .toList();
-        packet.write(Types.VAR_INT, stonecutterList.size()); // Number of recipes
-        for (CraftingDataStorage craftingData : stonecutterList) {
-            //IDs
-            packet.write(Types.VAR_INT, 2); // Type (Size + 1)
-            ShapelessRecipe recipe = (ShapelessRecipe) craftingData.recipe();
-            if (recipe.getIngredients().isEmpty()) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
-            } else {
-                recipe.getIngredients().get(0).writeJavaIngredientData(packet, user);
+        List<StonecutterUpdateRecipe> stonecutterList = new ArrayList<>();
+        for (CraftingDataStorage craftingData : craftingDataList) {
+            if (craftingData.recipe() == null || !craftingData.recipe().getRecipeTag().equals("stonecutter") || !(craftingData.recipe() instanceof ShapelessRecipe recipe)) {
+                continue;
+            }
+            if (recipe.getIngredients().isEmpty() || recipe.getResults().isEmpty()) {
+                continue;
             }
 
-            //Slot Display
-            Item javaOutput = itemRewriter.javaItem(recipe.getResults().get(0));
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item_stack")); // Type
-            packet.write(VersionedTypes.V26_1.itemTemplate, javaOutput);
+            final List<Integer> inputJavaItemIds = this.javaIngredientItemIds(user, recipe.getIngredients().get(0));
+            final Item javaOutput = itemRewriter.javaItem(recipe.getResults().get(0));
+            if (inputJavaItemIds.isEmpty() || javaOutput == null || javaOutput.isEmpty()) {
+                continue;
+            }
+            stonecutterList.add(new StonecutterUpdateRecipe(inputJavaItemIds, javaOutput));
+        }
+        packet.write(Types.VAR_INT, stonecutterList.size()); // Number of recipes
+        for (StonecutterUpdateRecipe recipe : stonecutterList) {
+            packet.write(Types.VAR_INT, recipe.inputJavaItemIds().size() + 1); // Direct ingredient holder set
+            for (Integer inputJavaItemId : recipe.inputJavaItemIds()) {
+                packet.write(Types.VAR_INT, inputJavaItemId);
+            }
+
+            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item_stack")); // Slot display type
+            packet.write(VersionedTypes.V26_1.itemTemplate, recipe.javaOutput());
         }
 
         packet.send(BedrockProtocol.class);
+    }
+
+    private List<Integer> javaIngredientItemIds(final UserConnection user, final ItemDescriptor descriptor) {
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final List<Integer> javaItemIds = new ArrayList<>();
+
+        if (descriptor instanceof ItemDescriptor.DefaultDescriptor defaultDescriptor && defaultDescriptor.itemId() > 0) {
+            this.addJavaIngredientItemId(javaItemIds, itemRewriter, new BedrockItem(defaultDescriptor.itemId(), (short) defaultDescriptor.auxValue(), (byte) 1));
+        } else if (descriptor instanceof ItemDescriptor.DeferredDescriptor deferredDescriptor) {
+            final Integer bedrockItemId = itemRewriter.getItems().get(Key.namespaced(deferredDescriptor.fullName()));
+            if (bedrockItemId != null) {
+                this.addJavaIngredientItemId(javaItemIds, itemRewriter, new BedrockItem(bedrockItemId, (short) deferredDescriptor.auxValue(), (byte) 1));
+            }
+        }
+
+        if (!javaItemIds.isEmpty()) {
+            return javaItemIds;
+        }
+
+        for (Map.Entry<String, Integer> entry : itemRewriter.getItems().entrySet()) {
+            final BedrockItem bedrockItem = new BedrockItem(entry.getValue());
+            if (descriptor.matchesItem(user, bedrockItem)) {
+                this.addJavaIngredientItemId(javaItemIds, itemRewriter, bedrockItem);
+            }
+        }
+        return javaItemIds;
+    }
+
+    private void addJavaIngredientItemId(final List<Integer> javaItemIds, final ItemRewriter itemRewriter, final BedrockItem bedrockItem) {
+        final Item javaItem = itemRewriter.javaItem(bedrockItem);
+        if (javaItem == null || javaItem.isEmpty() || javaItemIds.contains(javaItem.identifier())) {
+            return;
+        }
+        javaItemIds.add(javaItem.identifier());
     }
 
     public void sendJavaRecipeBook(final UserConnection user) {

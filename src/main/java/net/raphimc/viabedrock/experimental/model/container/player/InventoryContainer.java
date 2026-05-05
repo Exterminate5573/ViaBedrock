@@ -145,6 +145,7 @@ public class InventoryContainer extends ExperimentalContainer {
             return switch (action) {
                 case PICKUP -> this.craftToCursor(revision, inventoryTracker, resultItem, recipeMatch);
                 case QUICK_MOVE -> this.craftToInventory(revision, inventoryTracker, resultItem, recipeMatch);
+                case SWAP -> this.craftToSwapDestination(revision, inventoryTracker, resultItem, recipeMatch, button);
                 default -> false;
             };
         }
@@ -229,11 +230,8 @@ public class InventoryContainer extends ExperimentalContainer {
         }
 
         final int craftLimit = this.hasCraftingRemainders(inventoryTracker, recipeMatch.ingredients()) ? 1 : maxCrafts;
-        final int crafts = Math.min(craftLimit, this.craftsThatFit(resultItem, craftLimit));
+        final int crafts = this.craftsThatFit(inventoryTracker, resultItem, recipeMatch.ingredients(), craftLimit);
         if (crafts <= 0) {
-            return false;
-        }
-        if (!this.remaindersFit(inventoryTracker, recipeMatch.ingredients(), crafts)) {
             return false;
         }
 
@@ -247,6 +245,43 @@ public class InventoryContainer extends ExperimentalContainer {
         this.consumeIngredients(inventoryTracker, recipeMatch.ingredients(), crafts);
         this.updateCraftingOutputSlot(revision, inventoryTracker, this.resultItem(this.recipeMatch(inventoryTracker)));
         ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, this);
+        return true;
+    }
+
+    private boolean craftToSwapDestination(final int revision, final ExperimentalInventoryTracker inventoryTracker, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch, final byte button) {
+        final SwapDestination swapDestination = this.resultSwapDestination(button, resultItem);
+        if (swapDestination == null) {
+            return false;
+        }
+
+        final ExperimentalContainer inventoryCopy = this.copy();
+        if (swapDestination.container() == this) {
+            inventoryCopy.setItem(swapDestination.bedrockSlot(), resultItem.copy());
+        }
+        if (!this.remaindersFit(inventoryTracker, recipeMatch.ingredients(), inventoryCopy, 1)) {
+            return false;
+        }
+
+        final InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = this.craftActions(inventoryTracker, recipeMatch, resultItem, 1, requestId);
+        actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
+
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+        this.addPrevContainer(prevContainers, this);
+        this.addPrevContainer(prevContainers, inventoryTracker.getHudContainer());
+        this.addPrevContainer(prevContainers, swapDestination.container());
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, inventoryTracker.getHudContainer().copy(), prevContainers));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[]{request});
+
+        swapDestination.container().setItem(swapDestination.bedrockSlot(), resultItem.copy());
+        this.consumeIngredients(inventoryTracker, recipeMatch.ingredients(), 1);
+        this.updateCraftingOutputSlot(revision, inventoryTracker, this.resultItem(this.recipeMatch(inventoryTracker)));
+        ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, this);
+        if (swapDestination.container() != this) {
+            ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, swapDestination.container());
+        }
         return true;
     }
 
@@ -285,7 +320,10 @@ public class InventoryContainer extends ExperimentalContainer {
     private void addInventoryTransferActions(final List<ItemStackRequestAction> actions, final BedrockItem resultItem, final int totalAmount, final int requestId) {
         int remaining = totalAmount;
         for (boolean mergePass : new boolean[]{true, false}) {
-            for (int slot = this.size() - 1; slot >= 0 && remaining > 0; slot--) {
+            for (int slot : this.inventorySlots(this, true)) {
+                if (remaining <= 0) {
+                    break;
+                }
                 final BedrockItem destinationItem = this.getItem(slot);
                 if (mergePass) {
                     if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
@@ -308,24 +346,18 @@ public class InventoryContainer extends ExperimentalContainer {
         }
     }
 
-    private int craftsThatFit(final BedrockItem resultItem, final int maxCrafts) {
-        int remainingResultItems = maxCrafts * resultItem.amount();
-        for (boolean mergePass : new boolean[]{true, false}) {
-            for (int slot = this.size() - 1; slot >= 0 && remainingResultItems > 0; slot--) {
-                final BedrockItem destinationItem = this.getItem(slot);
-                if (mergePass) {
-                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
-                        continue;
-                    }
-                    remainingResultItems -= this.maxStackSize(resultItem) - destinationItem.amount();
-                } else if (destinationItem.isEmpty()) {
-                    remainingResultItems -= this.maxStackSize(resultItem);
-                }
+    private int craftsThatFit(final ExperimentalInventoryTracker inventoryTracker, final BedrockItem resultItem, final List<CraftingDataTracker.IngredientUse> ingredients, final int maxCrafts) {
+        for (int crafts = maxCrafts; crafts > 0; crafts--) {
+            final ExperimentalContainer inventoryCopy = this.copy();
+            final int totalResultAmount = crafts * resultItem.amount();
+            if (this.addToInventory(inventoryCopy, resultItem, totalResultAmount, true) != totalResultAmount) {
+                continue;
+            }
+            if (this.remaindersFit(inventoryTracker, ingredients, inventoryCopy, crafts)) {
+                return crafts;
             }
         }
-
-        final int fittingResultItems = maxCrafts * resultItem.amount() - Math.max(remainingResultItems, 0);
-        return fittingResultItems / resultItem.amount();
+        return 0;
     }
 
     private int maxCrafts(final ExperimentalInventoryTracker inventoryTracker, final List<CraftingDataTracker.IngredientUse> ingredients) {
@@ -349,7 +381,10 @@ public class InventoryContainer extends ExperimentalContainer {
     }
 
     private boolean remaindersFit(final ExperimentalInventoryTracker inventoryTracker, final List<CraftingDataTracker.IngredientUse> ingredients, final int crafts) {
-        final ExperimentalContainer inventoryCopy = this.copy();
+        return this.remaindersFit(inventoryTracker, ingredients, this.copy(), crafts);
+    }
+
+    private boolean remaindersFit(final ExperimentalInventoryTracker inventoryTracker, final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalContainer inventoryCopy, final int crafts) {
         for (int craft = 0; craft < crafts; craft++) {
             for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
                 for (int i = 0; i < ingredient.count(); i++) {

@@ -25,6 +25,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import net.raphimc.viabedrock.api.chunk.BedrockBlockEntity;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
@@ -111,7 +112,8 @@ public class CrafterContainer extends ExperimentalContainer {
     private boolean[] getCrafterMetadata() {
         ChunkTracker ct = this.user.get(ChunkTracker.class);
 
-        CompoundTag tag = ct.getBlockEntity(position).tag();
+        final BedrockBlockEntity blockEntity = ct.getBlockEntity(position);
+        CompoundTag tag = blockEntity != null ? blockEntity.tag() : null;
         if (tag == null || !tag.contains("disabled_slots")) return new boolean[9];
 
         boolean[] disabledSlots = new boolean[9];

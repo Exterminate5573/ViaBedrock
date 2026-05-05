@@ -91,6 +91,7 @@ public class CartographyContainer extends ExperimentalContainer {
         if (javaSlot == 2) {
             return this.handleCreatedOutputClick(
                     revision,
+                    button,
                     action,
                     this.getItem(50),
                     List.of(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)),

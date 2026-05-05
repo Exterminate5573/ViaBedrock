@@ -101,6 +101,7 @@ public class GrindstoneContainer extends ExperimentalContainer {
             }
             return this.handleCreatedOutputClick(
                     revision,
+                    button,
                     action,
                     resultItem,
                     List.of(new ItemStackRequestAction.CraftGrindstoneAction(0, 1, 0)),
