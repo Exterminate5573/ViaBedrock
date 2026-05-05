@@ -95,6 +95,17 @@ public class EnchantmentContainer extends ExperimentalContainer {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
+            return false;
+        }
+
+        System.arraycopy(items, 0, this.items, 0, items.length);
+        return true;
+    }
+
+    @Override
     public boolean handleButtonClick(final int button) {
         if (button < 0 || button > 2 || button >= this.data.size()) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received invalid enchantment option button click: " + button);

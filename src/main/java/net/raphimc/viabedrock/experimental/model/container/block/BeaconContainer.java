@@ -129,6 +129,17 @@ public class BeaconContainer extends ExperimentalContainer {
         return super.setItem(bedrockSlot - 27, item);
     }
 
+    @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
+            return false;
+        }
+
+        System.arraycopy(items, 0, this.items, 0, items.length);
+        return true;
+    }
+
     public void updateEffects(int primaryEffect, int secondaryEffect) {
         InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
         ExperimentalInventoryTracker inventoryTracker = this.user.get(ExperimentalInventoryTracker.class);

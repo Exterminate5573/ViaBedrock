@@ -114,6 +114,17 @@ public class SmithingContainer extends ExperimentalContainer {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
+            return false;
+        }
+
+        System.arraycopy(items, 0, this.items, 0, items.length);
+        return true;
+    }
+
+    @Override
     public boolean handleClick(int revision, short javaSlot, byte button, ContainerInput action) {
         boolean result = false;
         if (javaSlot != 3) {

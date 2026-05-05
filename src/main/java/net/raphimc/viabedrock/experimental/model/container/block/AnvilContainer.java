@@ -100,78 +100,88 @@ public class AnvilContainer extends ExperimentalContainer {
     }
 
     @Override
-    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        if (javaSlot == 2) {
-            if (!ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
-                return false;
-            }
-            //TODO: This is experimental code...
-            ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
-            InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-
-            int requestId = inventoryRequestTracker.nextRequestId();
-
-            List<ExperimentalContainer> prevContainers = new ArrayList<>();
-            prevContainers.add(this.copy());
-            prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-            ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
-
-            BedrockItem resultItem = this.getItem(1);
-
-            List<ItemStackRequestAction> actions = new ArrayList<>();
-            actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)); //TODO: This needs more debugging
-
-            // TODO: Recipe Check
-            if (!this.getItem(2).isEmpty()) {
-                actions.add(new ItemStackRequestAction.ConsumeAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
-                        new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
-                        (byte) 2,
-                        this.getItem(2).netId()
-                )));
-            }
-
-            actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                    new FullContainerName(ContainerEnumName.AnvilInputContainer, null),
-                    (byte) 1,
-                    this.getItem(1).netId()
-            )));
-            actions.add(new ItemStackRequestAction.PlaceAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
-                    new FullContainerName(ContainerEnumName.CreatedOutputContainer, null),
-                    (byte) 50,
-                    requestId
-            ), new ItemStackRequestSlotInfo( // TODO: Shift click
-                    new FullContainerName(ContainerEnumName.CursorContainer, null),
-                    (byte) 0,
-                    0 // Will be filled by the server
-            )));
-
-            List<String> filterStrings = new ArrayList<>();
-            TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
-            if (!this.getRenameText().isEmpty()) {
-                filterStrings.add(this.getRenameText());
-                origin = TextProcessingEventOrigin.AnvilText;
-
-                //TODO: Set the renamed item name
-                //resultItem.
-            }
-
-            ItemStackRequestInfo request = new ItemStackRequestInfo(
-                    requestId,
-                    actions,
-                    filterStrings,
-                    origin
-            );
-
-            this.setItem(1, BedrockItem.empty()); // Clear the input item
-            this.setItem(2, BedrockItem.empty()); // Clear the material item (TODO: May need an algo)
-            inventoryTracker.getHudContainer().setItem(0, resultItem);
-
-            inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-            ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
-        } else {
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
             return false;
         }
 
+        System.arraycopy(items, 0, this.items, 0, items.length);
+        return true;
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (javaSlot == 2) {
+            if (ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
+                //TODO: This is experimental code...
+                ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+                InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+
+                int requestId = inventoryRequestTracker.nextRequestId();
+
+                List<ExperimentalContainer> prevContainers = new ArrayList<>();
+                prevContainers.add(this.copy());
+                prevContainers.add(inventoryTracker.getInventoryContainer().copy());
+                ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
+
+                BedrockItem resultItem = this.getItem(50);
+
+                List<ItemStackRequestAction> actions = new ArrayList<>();
+                actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)); //TODO: This needs more debugging
+
+                // TODO: Recipe Check
+                if (!this.getItem(2).isEmpty()) {
+                    actions.add(new ItemStackRequestAction.ConsumeAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
+                            new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
+                            (byte) 2,
+                            this.getItem(2).netId()
+                    )));
+                }
+
+                actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
+                                new FullContainerName(ContainerEnumName.AnvilInputContainer, null),
+                                (byte) 1,
+                                this.getItem(1).netId()
+                        )));
+                actions.add(new ItemStackRequestAction.PlaceAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
+                                new FullContainerName(ContainerEnumName.CreatedOutputContainer, null),
+                                (byte) 50,
+                                requestId
+                            ), new ItemStackRequestSlotInfo( // TODO: Shift click
+                                    new FullContainerName(ContainerEnumName.CursorContainer, null),
+                                    (byte) 0,
+                                    0 // Will be filled by the server
+                            )));
+
+                List<String> filterStrings = new ArrayList<>();
+                TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
+                if (!this.getRenameText().isEmpty()) {
+                    filterStrings.add(this.getRenameText());
+                    origin = TextProcessingEventOrigin.AnvilText;
+
+                    //TODO: Set the renamed item name
+                    //resultItem.
+                }
+
+                ItemStackRequestInfo request = new ItemStackRequestInfo(
+                        requestId,
+                        actions,
+                        filterStrings,
+                        origin
+                );
+
+                this.setItem(1, BedrockItem.empty()); // Clear the input item
+                this.setItem(2, BedrockItem.empty()); // Clear the material item (TODO: May need an algo)
+                inventoryTracker.getHudContainer().setItem(0, resultItem);
+
+                inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
+                ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
+                return true;
+            } else {
+                return false;
+            }
+        }
         return super.handleClick(revision, javaSlot, button, action);
     }
 

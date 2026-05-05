@@ -207,6 +207,10 @@ public abstract class ExperimentalContainer {
         );
     }
 
+    private List<ItemStackRequestAction> singletonAction(final ItemStackRequestAction action) {
+        return action == null ? List.of() : List.of(action);
+    }
+
     private ItemStackRequestAction handlePickupPlace(final ClickContext clickContext, final ExperimentalContainer container, final int bedrockSlot, final byte button, final BedrockItem cursorItem, final BedrockItem item) {
         int amt = button == 0 ? cursorItem.amount() : 1;
         int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(64 - item.amount(), cursorItem.amount());
