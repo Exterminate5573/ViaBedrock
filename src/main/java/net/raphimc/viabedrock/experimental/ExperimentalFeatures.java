@@ -598,17 +598,18 @@ public class ExperimentalFeatures {
                 return;
             }
             final BedrockBlockEntity blockEntity = chunkTracker.getBlockEntity(position);
-            TextComponent title = new TranslationComponent("container." + blockStateRewriter.tag(chunkTracker.getBlockState(position)));
-            if (blockEntity != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
-                title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
-            }
-
             int size = 27;
             if (blockEntity != null && blockEntity.tag() != null
                     && blockEntity.tag().contains("id") && blockEntity.tag().getString("id").equals("Chest")
                     && blockEntity.tag().contains("pairlead")) {
                 // Double chest
                 size = 54;
+            }
+
+            final String blockTag = blockStateRewriter.tag(chunkTracker.getBlockState(position));
+            TextComponent title = new TranslationComponent(javaContainerTitleKey(type, blockTag, size));
+            if (blockEntity != null && blockEntity.tag() != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
+                title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
             }
 
             final ExperimentalContainer container;
@@ -1346,6 +1347,41 @@ public class ExperimentalFeatures {
     }
 
     private record CreativeSlot(ExperimentalContainer container, int bedrockSlot) {
+    }
+
+    private static String javaContainerTitleKey(final ContainerType type, final String blockTag, final int size) {
+        return switch (type) {
+            case ANVIL -> "container.repair";
+            case BEACON -> "container.beacon";
+            case BLAST_FURNACE -> "container.blast_furnace";
+            case BREWING_STAND -> "container.brewing";
+            case CARTOGRAPHY -> "container.cartography_table";
+            case CONTAINER -> {
+                if (size == 54) {
+                    yield "container.chestDouble";
+                }
+                if ("barrel".equals(blockTag)) {
+                    yield "container.barrel";
+                }
+                if (blockTag != null && blockTag.contains("shulker_box")) {
+                    yield "container.shulkerBox";
+                }
+                yield "container.chest";
+            }
+            case CRAFTER -> "container.crafter";
+            case DISPENSER -> "container.dispenser";
+            case DROPPER -> "container.dropper";
+            case ENCHANTMENT -> "container.enchant";
+            case FURNACE -> "container.furnace";
+            case GRINDSTONE -> "container.grindstone_title";
+            case HOPPER -> "container.hopper";
+            case LOOM -> "container.loom";
+            case SMITHING_TABLE -> "container.upgrade";
+            case SMOKER -> "container.smoker";
+            case STONECUTTER -> "container.stonecutter";
+            case WORKBENCH -> "container.crafting";
+            default -> "container." + blockTag;
+        };
     }
 
 }

@@ -109,8 +109,9 @@ public class InventoryPackets {
                 return;
             }
             final BedrockBlockEntity blockEntity = chunkTracker.getBlockEntity(position);
-            TextComponent title = new TranslationComponent("container." + blockStateRewriter.tag(chunkTracker.getBlockState(position)));
-            if (blockEntity != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
+            final String blockTag = blockStateRewriter.tag(chunkTracker.getBlockState(position));
+            TextComponent title = new TranslationComponent(javaContainerTitleKey(type, blockTag));
+            if (blockEntity != null && blockEntity.tag() != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
                 title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
             }
 
@@ -564,6 +565,21 @@ public class InventoryPackets {
                 dialog.getInputs().add(new Input("dummy", new BooleanInput(TextUtil.stringToTextComponent(text))));
             }
         }
+    }
+
+    private static String javaContainerTitleKey(final ContainerType type, final String blockTag) {
+        return switch (type) {
+            case CONTAINER -> {
+                if ("barrel".equals(blockTag)) {
+                    yield "container.barrel";
+                }
+                if (blockTag != null && blockTag.contains("shulker_box")) {
+                    yield "container.shulkerBox";
+                }
+                yield "container.chest";
+            }
+            default -> "container." + blockTag;
+        };
     }
 
 }
