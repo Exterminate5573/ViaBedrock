@@ -174,7 +174,7 @@ public class AnvilContainer extends ExperimentalContainer {
             )));
 
             if (action == ContainerInput.PICKUP) {
-                actions.add(new ItemStackRequestAction.TakeAction(
+                actions.add(new ItemStackRequestAction.PlaceAction(
                         resultItem.amount(),
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
@@ -182,7 +182,7 @@ public class AnvilContainer extends ExperimentalContainer {
             } else if (action == ContainerInput.QUICK_MOVE) {
                 this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
             } else {
-                actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
+                actions.add(this.placeCreatedOutputAction(resultItem, requestId, swapDestination));
             }
 
             final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, filterStrings, origin);
