@@ -31,6 +31,7 @@ import net.raphimc.viabedrock.experimental.storage.MapTracker;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.Enchant_Type;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.Map;
 import java.util.logging.Level;
@@ -111,7 +112,7 @@ public class ExperimentalItemRewriter {
                     }
                 }
 
-                javaItem.dataContainer().set(StructuredDataKey.ENCHANTMENTS1_21_5, javaEnchantments);
+                javaItem.dataContainer().set(isEnchantedBook(user, bedrockItem) ? StructuredDataKey.STORED_ENCHANTMENTS1_21_5 : StructuredDataKey.ENCHANTMENTS1_21_5, javaEnchantments);
             }
 
         }
@@ -190,5 +191,9 @@ public class ExperimentalItemRewriter {
         }
 
         return bedrockItem.tag();
+    }
+
+    private static boolean isEnchantedBook(final UserConnection user, final BedrockItem bedrockItem) {
+        return "minecraft:enchanted_book".equals(user.get(ItemRewriter.class).getItems().inverse().get(bedrockItem.identifier()));
     }
 }

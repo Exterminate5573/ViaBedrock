@@ -451,8 +451,7 @@ public class ExperimentalFeatures {
                 ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
                 return;
             }
-            final BedrockItem creativeResultTemplate = creativeContentStorage.creativeItem(creativeNetworkId);
-            if (creativeResultTemplate.isEmpty()) {
+            if (creativeContentStorage.creativeItem(creativeNetworkId).isEmpty()) {
                 ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
                 return;
             }
@@ -460,7 +459,7 @@ public class ExperimentalFeatures {
             final int requestId = inventoryRequestTracker.nextRequestId();
             final List<ItemStackRequestAction> actions = new ArrayList<>();
             actions.add(new ItemStackRequestAction.CraftCreativeAction(creativeNetworkId, 1));
-            actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(creativeResultTemplate), 1));
+            actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(bedrockItem), 1));
 
             final List<ExperimentalContainer> prevContainers = new ArrayList<>();
             if (creativeSlot != null) {
