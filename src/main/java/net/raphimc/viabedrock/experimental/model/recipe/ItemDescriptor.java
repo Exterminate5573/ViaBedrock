@@ -85,8 +85,21 @@ public interface ItemDescriptor {
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
-            //TODO
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+            final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+            final Integer itemId = itemRewriter.getItems().get(Key.namespaced(name));
+            if (itemId == null) {
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                return;
+            }
+
+            final Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
+            if (javaItem == null) {
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                return;
+            }
+
+            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
+            packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
         }
 
         @Override
@@ -117,7 +130,8 @@ public interface ItemDescriptor {
             ItemRewriter itemRewriter = user.get(ItemRewriter.class);
             Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
             if (javaItem == null) {
-                throw new IllegalStateException("Could not find Java item for Bedrock ID: " + itemId);
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                return;
             }
 
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
@@ -156,10 +170,16 @@ public interface ItemDescriptor {
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
             ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-            int itemId = itemRewriter.getItems().get(Key.namespaced(fullName));
+            Integer itemId = itemRewriter.getItems().get(Key.namespaced(fullName));
+            if (itemId == null) {
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                return;
+            }
+
             Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
             if (javaItem == null) {
-                throw new IllegalStateException("Could not find Java item for Bedrock ID: " + itemId);
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                return;
             }
 
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
@@ -273,6 +293,11 @@ public interface ItemDescriptor {
             }
 
             return false;
+        }
+
+        @Override
+        public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
+            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
         }
 
         @Override

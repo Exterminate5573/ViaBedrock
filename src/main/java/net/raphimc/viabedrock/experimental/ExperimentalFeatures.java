@@ -17,6 +17,7 @@
  */
 package net.raphimc.viabedrock.experimental;
 
+import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.connection.UserConnection;
@@ -910,30 +911,29 @@ public class ExperimentalFeatures {
                 List<ExperimentalContainer> mismatchedContainers = new ArrayList<>();
                 for (ItemStackResponseContainerInfo containerInfo : info.containers()) {
                     for (ItemStackResponseSlotInfo slotInfo : containerInfo.slots()) {
-                        ExperimentalContainer container = inventoryTracker.getContainerFromName(containerInfo.containerName(), slotInfo.slot());
+                        final int bedrockSlot = Byte.toUnsignedInt(slotInfo.requestedSlot());
+                        ExperimentalContainer container = inventoryTracker.getContainerFromName(containerInfo.containerName(), bedrockSlot);
                         if (container == null) {
                             ViaBedrock.getPlatform().getLogger().warning("Received item stack response for unknown container: " + containerInfo.containerName());
                             continue;
                         }
 
                         // Check if the item matches the expected item
-                        BedrockItem expectedItem = container.getItem(slotInfo.slot());
+                        BedrockItem expectedItem = container.getItem(bedrockSlot);
                         if (expectedItem.isEmpty()) {
                             if (slotInfo.amount() != 0 || slotInfo.itemNetId() != 0) {
                                 mismatchedContainers.add(container);
                             }
                             continue;
                         }
-                        if (expectedItem.netId() == null || expectedItem.netId() != slotInfo.itemNetId() || expectedItem.amount() != slotInfo.amount()) {
-                            BedrockItem newItem = expectedItem.copy();
-                            newItem.setNetId(slotInfo.itemNetId());
-                            newItem.setAmount(slotInfo.amount());
-                            container.setItem(slotInfo.slot(), newItem);
-                            if (container.getFullContainerName(slotInfo.slot()).name() != ContainerEnumName.CursorContainer) {
+                        final BedrockItem newItem = expectedItem.copy();
+                        applyItemStackResponse(newItem, slotInfo);
+                        if (!newItem.equals(expectedItem)) {
+                            container.setItem(bedrockSlot, newItem);
+                            if (container.getFullContainerName(bedrockSlot).name() != ContainerEnumName.CursorContainer) {
                                 mismatchedContainers.add(container);
                             }
                         }
-                        // TODO:  Handle custom name and durability
                     }
                 }
 
@@ -1313,6 +1313,34 @@ public class ExperimentalFeatures {
             return new CreativeSlot(inventoryTracker.getOffhandContainer(), inventoryTracker.getOffhandContainer().bedrockSlot(javaSlot));
         }
         return null;
+    }
+
+    private static void applyItemStackResponse(final BedrockItem item, final ItemStackResponseSlotInfo slotInfo) {
+        item.setNetId(slotInfo.itemNetId());
+        item.setAmount(Byte.toUnsignedInt(slotInfo.amount()));
+        if (slotInfo.durability() != 0) {
+            itemTag(item).putInt("Damage", slotInfo.durability());
+        }
+
+        final String customName = !slotInfo.customName().isEmpty() ? slotInfo.customName() : slotInfo.filteredCustomName();
+        if (!customName.isEmpty()) {
+            final CompoundTag tag = itemTag(item);
+            final CompoundTag displayTag;
+            if (tag.get("display") instanceof CompoundTag existingDisplayTag) {
+                displayTag = existingDisplayTag;
+            } else {
+                displayTag = new CompoundTag();
+                tag.put("display", displayTag);
+            }
+            displayTag.putString("Name", customName);
+        }
+    }
+
+    private static CompoundTag itemTag(final BedrockItem item) {
+        if (item.tag() == null) {
+            item.setTag(new CompoundTag());
+        }
+        return item.tag();
     }
 
     private record CreativeSlot(ExperimentalContainer container, int bedrockSlot) {

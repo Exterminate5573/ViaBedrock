@@ -198,12 +198,15 @@ public class CraftingDataTracker extends StoredObject {
         for (CraftingDataStorage craftingData : stonecutterList) {
             //IDs
             packet.write(Types.VAR_INT, 2); // Type (Size + 1)
-            int bedrockId = ((ItemDescriptor.DefaultDescriptor)((ShapelessRecipe)craftingData.recipe()).getIngredients().get(0)).itemId(); // TODO: clean
-            int javaId = itemRewriter.javaItem(new BedrockItem(bedrockId)).identifier();
-            packet.write(Types.VAR_INT, javaId);
+            ShapelessRecipe recipe = (ShapelessRecipe) craftingData.recipe();
+            if (recipe.getIngredients().isEmpty()) {
+                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+            } else {
+                recipe.getIngredients().get(0).writeJavaIngredientData(packet, user);
+            }
 
             //Slot Display
-            Item javaOutput = itemRewriter.javaItem(((ShapelessRecipe)craftingData.recipe()).getResults().get(0));
+            Item javaOutput = itemRewriter.javaItem(recipe.getResults().get(0));
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item_stack")); // Type
             packet.write(VersionedTypes.V26_1.itemTemplate, javaOutput);
         }

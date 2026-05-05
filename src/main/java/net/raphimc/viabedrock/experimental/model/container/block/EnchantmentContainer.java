@@ -101,8 +101,7 @@ public class EnchantmentContainer extends ExperimentalContainer {
             return false;
         }
 
-        System.arraycopy(items, 0, this.items, 0, items.length);
-        return true;
+        return super.setItems(items);
     }
 
     @Override

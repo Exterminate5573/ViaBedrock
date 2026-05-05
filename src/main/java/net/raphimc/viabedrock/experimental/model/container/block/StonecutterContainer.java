@@ -180,6 +180,7 @@ public class StonecutterContainer extends ExperimentalContainer {
 
         List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
+        actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), craftableAmount));
         actions.add(new ItemStackRequestAction.ConsumeAction(
                 toConsume,
                 new ItemStackRequestSlotInfo(

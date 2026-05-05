@@ -38,7 +38,6 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
@@ -202,7 +201,7 @@ public abstract class ExperimentalContainer {
 
         return new ItemStackRequestAction.TakeAction(
                 amountToTake,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, finalCursorItem.netId()),
+                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, this.stackNetId(item)),
                 new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, 0)
         );
     }
@@ -211,7 +210,7 @@ public abstract class ExperimentalContainer {
         int amt = button == 0 ? cursorItem.amount() : 1;
         int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(64 - item.amount(), cursorItem.amount());
 
-        final int containerNetId = item.netId() != null ? item.netId() : 0;
+        final int containerNetId = this.stackNetId(item);
         BedrockItem finalContainerItem = item.copy();
         if (item.isDifferent(cursorItem)) {
             finalContainerItem = cursorItem.copy();
@@ -221,7 +220,7 @@ public abstract class ExperimentalContainer {
         }
         container.setItem(bedrockSlot, finalContainerItem);
 
-        final int cursorNetId = cursorItem.netId();
+        final int cursorNetId = this.stackNetId(cursorItem);
         BedrockItem finalCursorItem = this.itemAfterRemovingAmount(cursorItem, amountToPlace);
         clickContext.inventoryTracker.getHudContainer().setItem(0, finalCursorItem);
 
@@ -240,8 +239,8 @@ public abstract class ExperimentalContainer {
         clickContext.inventoryTracker.getHudContainer().setItem(0, itemCopy);
 
         return new ItemStackRequestAction.SwapAction(
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, cursorItem.netId()),
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId())
+                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, this.stackNetId(cursorItem)),
+                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, this.stackNetId(item))
         );
     }
 
@@ -281,20 +280,20 @@ public abstract class ExperimentalContainer {
         if (hotbarItem.isEmpty()) {
             return new ItemStackRequestAction.PlaceAction(
                     item.amount(),
-                    new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId()),
+                    new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, this.stackNetId(item)),
                     new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, 0)
             );
         } else if (item.isEmpty()) {
             return new ItemStackRequestAction.PlaceAction(
                     hotbarItem.amount(),
-                    new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, hotbarItem.netId()),
+                    new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, this.stackNetId(hotbarItem)),
                     new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, 0)
             );
         }
 
         return new ItemStackRequestAction.SwapAction(
-                new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, hotbarItem.netId()),
-                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId())
+                new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, this.stackNetId(hotbarItem)),
+                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, this.stackNetId(item))
         );
     }
 
@@ -344,14 +343,12 @@ public abstract class ExperimentalContainer {
                         continue;
                     }
 
-                    int destNetId = destinationItem != null && !destinationItem.isEmpty() ? destinationItem.netId() : 0;
-
                     clickContext.prevContainers.add(source.container());
                     clickContext.prevContainers.add(range.container());
                     actions.add(new ItemStackRequestAction.PlaceAction(
                             amountToMove,
-                            new ItemStackRequestSlotInfo(source.container().getFullContainerName(source.bedrockSlot()), (byte) source.bedrockSlot(), sourceItem.netId()),
-                            new ItemStackRequestSlotInfo(range.container().getFullContainerName(bedrockDestSlot), (byte) bedrockDestSlot, destNetId)
+                            new ItemStackRequestSlotInfo(source.container().getFullContainerName(source.bedrockSlot()), (byte) source.bedrockSlot(), this.stackNetId(sourceItem)),
+                            new ItemStackRequestSlotInfo(range.container().getFullContainerName(bedrockDestSlot), (byte) bedrockDestSlot, this.stackNetId(destinationItem))
                     ));
 
                     final BedrockItem newSourceItem = this.itemAfterRemovingAmount(sourceItem, amountToMove);
@@ -385,18 +382,23 @@ public abstract class ExperimentalContainer {
         }
         clickContext.prevContainers.add(container.copy());
     }
+
     private ItemStackRequestAction handleThrowClick(final ClickContext clickContext, final short javaSlot, final byte button) {
         if (javaSlot == -999) {
             return this.dropCursorItem(clickContext.inventoryTracker, button);
         }
 
-        ExperimentalContainer container = clickContext.container;
-        if (javaSlot < 0 || javaSlot >= container.getItems().length) {
-            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle throw for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
+        final SlotRef source = this.resolveJavaSlot(clickContext, javaSlot);
+        if (source == null) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle throw for " + clickContext.container.type() + ", but slot was out of bounds (" + javaSlot + ")");
             return null;
         }
 
-        BedrockItem item = container.getItem(clickContext.bedrockSlot);
+        ExperimentalContainer container = source.container();
+        int bedrockSlot = source.bedrockSlot();
+        this.addPrevContainer(clickContext, container);
+
+        BedrockItem item = container.getItem(bedrockSlot);
 
         if (item.isEmpty()) {
             return null;
@@ -405,11 +407,11 @@ public abstract class ExperimentalContainer {
         int amountToDrop = button == 0 ? 1 : item.amount();
 
         BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
-        container.setItem(clickContext.bedrockSlot, finalContainerItem);
+        container.setItem(bedrockSlot, finalContainerItem);
 
         return new ItemStackRequestAction.DropAction(
                 amountToDrop,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId()),
+                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, this.stackNetId(item)),
                 false
         );
     }
@@ -425,7 +427,7 @@ public abstract class ExperimentalContainer {
 
         return new ItemStackRequestAction.DropAction(
                 amountToDrop,
-                new ItemStackRequestSlotInfo(inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, cursorItem.netId()),
+                new ItemStackRequestSlotInfo(inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, this.stackNetId(cursorItem)),
                 false
         );
     }
@@ -441,7 +443,7 @@ public abstract class ExperimentalContainer {
 
         return new ItemStackRequestAction.DropAction(
                 amountToDrop,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId()),
+                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, this.stackNetId(item)),
                 false
         );
     }
@@ -587,6 +589,10 @@ public abstract class ExperimentalContainer {
         return new SlotRef(container, bedrockSlot);
     }
 
+    protected int stackNetId(final BedrockItem item) {
+        return item.netId() != null ? item.netId() : 0;
+    }
+
     protected BedrockItem copyStackWithAmount(final BedrockItem item, final int amount) {
         BedrockItem copy = item.copy();
         copy.setAmount(amount);
@@ -690,7 +696,7 @@ public abstract class ExperimentalContainer {
     }
 
     public BedrockItem[] getItems() {
-        return Arrays.copyOf(this.items, this.items.length);
+        return this.copyItems();
     }
 
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
@@ -711,7 +717,9 @@ public abstract class ExperimentalContainer {
             return false;
         }
 
-        System.arraycopy(items, 0, this.items, 0, items.length);
+        for (int i = 0; i < items.length; i++) {
+            this.items[i] = items[i] != null ? items[i].copy() : BedrockItem.empty();
+        }
         return true;
     }
 
@@ -759,13 +767,21 @@ public abstract class ExperimentalContainer {
     }
 
     public ExperimentalContainer copy() { // TODO: This probably isnt the best way to do this
-        BedrockItem[] itemsCopy = Arrays.copyOf(this.items, this.items.length);
+        BedrockItem[] itemsCopy = this.copyItems();
         return new ExperimentalContainer(this.user, this.containerId, this.type, this.title, this.position, itemsCopy, this.validBlockTags) {
             @Override
             public FullContainerName getFullContainerName(int slot) {
                 return ExperimentalContainer.this.getFullContainerName(slot);
             }
         };
+    }
+
+    private BedrockItem[] copyItems() {
+        final BedrockItem[] itemsCopy = new BedrockItem[this.items.length];
+        for (int i = 0; i < this.items.length; i++) {
+            itemsCopy[i] = this.items[i] != null ? this.items[i].copy() : BedrockItem.empty();
+        }
+        return itemsCopy;
     }
 
     public short translateContainerData(int containerData) {
