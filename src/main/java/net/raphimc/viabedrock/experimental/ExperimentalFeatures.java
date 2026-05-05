@@ -1378,6 +1378,9 @@ public class ExperimentalFeatures {
                 if ("barrel".equals(blockTag)) {
                     yield "container.barrel";
                 }
+                if ("ender_chest".equals(blockTag)) {
+                    yield "container.enderchest";
+                }
                 if (blockTag != null && blockTag.contains("shulker_box")) {
                     yield "container.shulkerBox";
                 }
