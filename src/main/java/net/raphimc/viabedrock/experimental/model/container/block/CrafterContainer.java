@@ -29,6 +29,7 @@ import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
@@ -92,6 +93,14 @@ public class CrafterContainer extends ExperimentalContainer {
             return true;
         }
         return super.setItem(bedrockSlot, item);
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (javaSlot == 45) {
+            return false;
+        }
+        return super.handleClick(revision, javaSlot, button, action);
     }
 
     private boolean[] getCrafterMetadata() {

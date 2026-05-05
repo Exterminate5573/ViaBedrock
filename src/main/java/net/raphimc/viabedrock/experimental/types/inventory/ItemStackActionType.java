@@ -21,6 +21,7 @@ import com.viaversion.viaversion.api.type.Type;
 import io.netty.buffer.ByteBuf;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.types.ExperimentalBedrockTypes;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.ItemEntry;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
@@ -139,7 +140,7 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
             case CraftResults_DEPRECATEDASKTYLAING -> {
                 ItemStackRequestAction.CraftResultsDeprecatedAction craftResultsAction = (ItemStackRequestAction.CraftResultsDeprecatedAction) value;
 
-                BedrockTypes.ITEM_ENTRY_ARRAY.write(buffer, craftResultsAction.resultItems().toArray(new ItemEntry[0]));
+                ExperimentalBedrockTypes.ITEM_STACK_REQUEST_ITEMS.write(buffer, craftResultsAction.resultItems().toArray(new BedrockItem[0]));
                 buffer.writeByte(craftResultsAction.timesCrafted());
             }
 

@@ -23,6 +23,7 @@ import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
@@ -113,76 +114,129 @@ public class AnvilContainer extends ExperimentalContainer {
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 2) {
-            if (ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
-                //TODO: This is experimental code...
-                ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
-                InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-
-                int requestId = inventoryRequestTracker.nextRequestId();
-
-                List<ExperimentalContainer> prevContainers = new ArrayList<>();
-                prevContainers.add(this.copy());
-                prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-                ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
-
-                BedrockItem resultItem = this.getItem(50);
-
-                List<ItemStackRequestAction> actions = new ArrayList<>();
-                actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)); //TODO: This needs more debugging
-
-                // TODO: Recipe Check
-                if (!this.getItem(2).isEmpty()) {
-                    actions.add(new ItemStackRequestAction.ConsumeAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
-                            new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
-                            (byte) 2,
-                            this.getItem(2).netId()
-                    )));
-                }
-
-                actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                                new FullContainerName(ContainerEnumName.AnvilInputContainer, null),
-                                (byte) 1,
-                                this.getItem(1).netId()
-                        )));
-                actions.add(new ItemStackRequestAction.PlaceAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
-                                new FullContainerName(ContainerEnumName.CreatedOutputContainer, null),
-                                (byte) 50,
-                                requestId
-                            ), new ItemStackRequestSlotInfo( // TODO: Shift click
-                                    new FullContainerName(ContainerEnumName.CursorContainer, null),
-                                    (byte) 0,
-                                    0 // Will be filled by the server
-                            )));
-
-                List<String> filterStrings = new ArrayList<>();
-                TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
-                if (!this.getRenameText().isEmpty()) {
-                    filterStrings.add(this.getRenameText());
-                    origin = TextProcessingEventOrigin.AnvilText;
-
-                    //TODO: Set the renamed item name
-                    //resultItem.
-                }
-
-                ItemStackRequestInfo request = new ItemStackRequestInfo(
-                        requestId,
-                        actions,
-                        filterStrings,
-                        origin
-                );
-
-                this.setItem(1, BedrockItem.empty()); // Clear the input item
-                this.setItem(2, BedrockItem.empty()); // Clear the material item (TODO: May need an algo)
-                inventoryTracker.getHudContainer().setItem(0, resultItem);
-
-                inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-                ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
-                return true;
-            } else {
+            if (!ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
                 return false;
             }
+            if (action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE) {
+                return false;
+            }
+
+            final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+            final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+            final InventoryContainer inventory = inventoryTracker.getInventoryContainer();
+            final BedrockItem inputItem = this.getItem(1);
+            final BedrockItem materialItem = this.getItem(2);
+            final BedrockItem resultItem = this.getItem(50);
+            if (inputItem.isEmpty() || resultItem.isEmpty()) {
+                return false;
+            }
+
+            final BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
+            if (action == ContainerInput.PICKUP && !cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
+                return false;
+            }
+            if (action == ContainerInput.QUICK_MOVE && this.inventoryCapacity(inventory, resultItem) < resultItem.amount()) {
+                return false;
+            }
+
+            final int requestId = inventoryRequestTracker.nextRequestId();
+            final List<ItemStackRequestAction> actions = new ArrayList<>();
+            actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0));
+            if (!materialItem.isEmpty()) {
+                actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
+                        new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
+                        (byte) 2,
+                        materialItem.netId() != null ? materialItem.netId() : 0
+                )));
+            }
+            actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
+                    new FullContainerName(ContainerEnumName.AnvilInputContainer, null),
+                    (byte) 1,
+                    inputItem.netId() != null ? inputItem.netId() : 0
+            )));
+
+            if (action == ContainerInput.PICKUP) {
+                actions.add(new ItemStackRequestAction.PlaceAction(
+                        resultItem.amount(),
+                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
+                ));
+            } else {
+                this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
+            }
+
+            final List<String> filterStrings = new ArrayList<>();
+            TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
+            if (!this.getRenameText().isEmpty()) {
+                filterStrings.add(this.getRenameText());
+                origin = TextProcessingEventOrigin.AnvilText;
+            }
+
+            final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, filterStrings, origin);
+            final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+            prevContainers.add(this.copy());
+            prevContainers.add(inventory.copy());
+            inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, inventoryTracker.getHudContainer().copy(), prevContainers));
+            ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
+
+            this.setItem(1, this.itemAfterRemovingAmount(inputItem, 1));
+            this.setItem(2, this.itemAfterRemovingAmount(materialItem, 1));
+            this.setItem(50, BedrockItem.empty());
+            if (action == ContainerInput.PICKUP) {
+                if (cursorItem.isEmpty()) {
+                    inventoryTracker.getHudContainer().setItem(0, resultItem.copy());
+                } else {
+                    final BedrockItem newCursorItem = cursorItem.copy();
+                    newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
+                    inventoryTracker.getHudContainer().setItem(0, newCursorItem);
+                }
+            } else {
+                this.addToInventory(inventory, resultItem, resultItem.amount(), true);
+                ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventory);
+            }
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+            return true;
         }
         return super.handleClick(revision, javaSlot, button, action);
+    }
+
+    private void addOutputToInventoryActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
+        int remaining = totalAmount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot = inventory.size() - 1; slot >= 0 && remaining > 0; slot--) {
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
+                        : Math.min(remaining, this.maxStackSize(resultItem));
+                actions.add(new ItemStackRequestAction.PlaceAction(
+                        amountToMove,
+                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                ));
+                remaining -= amountToMove;
+            }
+        }
+    }
+
+    private int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
+        int capacity = 0;
+        for (int slot = inventory.size() - 1; slot >= 0; slot--) {
+            final BedrockItem item = inventory.getItem(slot);
+            if (item.isEmpty()) {
+                capacity += this.maxStackSize(resultItem);
+            } else if (!item.isDifferent(resultItem)) {
+                capacity += this.maxStackSize(resultItem) - item.amount();
+            }
+        }
+        return capacity;
     }
 
     public String getRenameText() {

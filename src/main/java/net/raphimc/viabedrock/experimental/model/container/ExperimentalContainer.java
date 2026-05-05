@@ -207,10 +207,6 @@ public abstract class ExperimentalContainer {
         );
     }
 
-    private List<ItemStackRequestAction> singletonAction(final ItemStackRequestAction action) {
-        return action == null ? List.of() : List.of(action);
-    }
-
     private ItemStackRequestAction handlePickupPlace(final ClickContext clickContext, final ExperimentalContainer container, final int bedrockSlot, final byte button, final BedrockItem cursorItem, final BedrockItem item) {
         int amt = button == 0 ? cursorItem.amount() : 1;
         int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(64 - item.amount(), cursorItem.amount());
@@ -255,13 +251,22 @@ public abstract class ExperimentalContainer {
             return null;
         }
 
-        ExperimentalContainer container = clickContext.container;
-        if (javaSlot < 0 || javaSlot >= container.getItems().length) {
-            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle swap for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
+        final SlotRef source = this.resolveJavaSlot(clickContext, javaSlot);
+        if (source == null) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle swap for " + clickContext.container.type() + ", but slot was out of bounds (" + javaSlot + ")");
             return null;
         }
 
+        ExperimentalContainer container = source.container();
+        clickContext.container = container;
+        clickContext.bedrockSlot = source.bedrockSlot();
+
         ExperimentalContainer hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
+        if (container == hotbarContainer && clickContext.bedrockSlot == button) {
+            return null;
+        }
+        this.addPrevContainer(clickContext, container);
+        this.addPrevContainer(clickContext, hotbarContainer);
 
         BedrockItem item = container.getItem(clickContext.bedrockSlot).copy();
         BedrockItem hotbarItem = hotbarContainer.getItem(button).copy();
@@ -368,6 +373,18 @@ public abstract class ExperimentalContainer {
         return actions;
     }
 
+    protected int maxStackSize(final BedrockItem item) {
+        return 64;
+    }
+
+    private void addPrevContainer(final ClickContext clickContext, final ExperimentalContainer container) {
+        for (ExperimentalContainer prevContainer : clickContext.prevContainers) {
+            if (prevContainer.containerId() == container.containerId()) {
+                return;
+            }
+        }
+        clickContext.prevContainers.add(container.copy());
+    }
     private ItemStackRequestAction handleThrowClick(final ClickContext clickContext, final short javaSlot, final byte button) {
         if (javaSlot == -999) {
             return this.dropCursorItem(clickContext.inventoryTracker, button);
@@ -570,10 +587,51 @@ public abstract class ExperimentalContainer {
         return new SlotRef(container, bedrockSlot);
     }
 
-    private BedrockItem copyStackWithAmount(final BedrockItem item, final int amount) {
+    protected BedrockItem copyStackWithAmount(final BedrockItem item, final int amount) {
         BedrockItem copy = item.copy();
         copy.setAmount(amount);
         return copy;
+    }
+
+    protected int addToInventory(final InventoryContainer inventory, final BedrockItem item, final int amount, final boolean backwards) {
+        if (item.isEmpty() || amount <= 0) {
+            return 0;
+        }
+
+        int remaining = amount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            final int start = backwards ? inventory.size() - 1 : 0;
+            final int end = backwards ? -1 : inventory.size();
+            final int step = backwards ? -1 : 1;
+            for (int slot = start; slot != end && remaining > 0; slot += step) {
+                final BedrockItem target = inventory.getItem(slot);
+                if (mergePass) {
+                    if (target.isEmpty() || target.isDifferent(item) || target.amount() >= this.maxStackSize(item)) {
+                        continue;
+                    }
+                } else if (!target.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(item) - target.amount())
+                        : Math.min(remaining, this.maxStackSize(item));
+                if (amountToMove <= 0) {
+                    continue;
+                }
+
+                if (target.isEmpty()) {
+                    inventory.setItem(slot, this.copyStackWithAmount(item, amountToMove));
+                } else {
+                    final BedrockItem newTarget = target.copy();
+                    newTarget.setAmount(target.amount() + amountToMove);
+                    inventory.setItem(slot, newTarget);
+                }
+                remaining -= amountToMove;
+            }
+        }
+
+        return amount - remaining;
     }
 
     protected BedrockItem itemAfterRemovingAmount(final BedrockItem item, final int amountToRemove) {

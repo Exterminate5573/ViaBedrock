@@ -18,12 +18,15 @@
 package net.raphimc.viabedrock.experimental.types;
 
 import com.viaversion.viaversion.api.type.Type;
+import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap;
 import net.raphimc.viabedrock.experimental.model.inventory.*;
 import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
 import net.raphimc.viabedrock.experimental.types.inventory.*;
 import net.raphimc.viabedrock.experimental.types.recipe.NetworkItemDescriptorType;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import net.raphimc.viabedrock.protocol.types.array.ArrayType;
+import net.raphimc.viabedrock.protocol.types.item.BedrockItemType;
 
 public class ExperimentalBedrockTypes {
 
@@ -33,6 +36,8 @@ public class ExperimentalBedrockTypes {
     public static final Type<ItemStackRequestInfo[]> ITEM_STACK_REQUESTS = new ArrayType<>(new ItemStackRequestType(), BedrockTypes.UNSIGNED_VAR_INT);
     public static final Type<ItemStackRequestAction[]> ITEM_STACK_REQUEST_ACTIONS = new ArrayType<>(new ItemStackActionType(), BedrockTypes.UNSIGNED_VAR_INT);
     public static final Type<ItemStackRequestSlotInfo> ITEM_STACK_REQUEST_SLOT = new ItemStackSlotRequestType();
+    public static final Type<BedrockItem> ITEM_STACK_REQUEST_ITEM = new BedrockItemType(0, new Int2ObjectOpenHashMap<>(), false, false);
+    public static final Type<BedrockItem[]> ITEM_STACK_REQUEST_ITEMS = new ArrayType<>(ITEM_STACK_REQUEST_ITEM, BedrockTypes.UNSIGNED_VAR_INT);
 
     public static final Type<ItemStackResponseInfo[]> ITEM_STACK_RESPONSES = new ArrayType<>(new ItemStackResponseType(), BedrockTypes.UNSIGNED_VAR_INT);
     public static final Type<ItemStackResponseContainerInfo[]> ITEM_STACK_RESPONSE_CONTAINERS = new ArrayType<>(new ItemStackContainerResponseType(), BedrockTypes.UNSIGNED_VAR_INT);

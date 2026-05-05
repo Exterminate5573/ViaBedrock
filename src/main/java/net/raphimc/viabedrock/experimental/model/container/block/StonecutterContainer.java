@@ -27,6 +27,7 @@ import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPack
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
@@ -126,6 +127,9 @@ public class StonecutterContainer extends ExperimentalContainer {
         if (this.currentRecipes.isEmpty()) {
             return result;
         }
+        if (this.selectedRecipe >= this.currentRecipes.size()) {
+            this.selectedRecipe = 0;
+        }
 
         ItemRewriter itemRewriter = user.get(ItemRewriter.class);
         final CraftingDataStorage craftingDataStorage = this.currentRecipes.get(this.selectedRecipe);
@@ -148,21 +152,31 @@ public class StonecutterContainer extends ExperimentalContainer {
         if (javaSlot != 1) {
             return result;
         }
+        if (action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE) {
+            return false;
+        }
 
         ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        InventoryContainer inventory = inventoryTracker.getInventoryContainer();
 
         List<ExperimentalContainer> prevContainers = new ArrayList<>();
         prevContainers.add(this.copy());
-        prevContainers.add(inventoryTracker.getInventoryContainer().copy());
+        prevContainers.add(inventory.copy());
         ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
         int nextRequestId = inventoryRequestTracker.nextRequestId();
         BedrockItem sourceItem = this.getItem(3);
+        BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
+        if (action == ContainerInput.PICKUP && !cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
+            return false;
+        }
 
-        int craftableAmount = 1;
+        int craftableAmount = action == ContainerInput.QUICK_MOVE ? Math.min(sourceItem.amount(), this.craftsThatFit(inventory, resultItem, sourceItem.amount())) : 1;
+        if (craftableAmount <= 0) {
+            return false;
+        }
         int toConsume = Math.min(sourceItem.amount(), craftableAmount);
-        // TODO: shift click = max to inventory
 
         List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
@@ -171,22 +185,18 @@ public class StonecutterContainer extends ExperimentalContainer {
                 new ItemStackRequestSlotInfo(
                         this.getFullContainerName(3),
                         (byte) 3,
-                        sourceItem.netId()
+                        sourceItem.netId() != null ? sourceItem.netId() : 0
                 )
         ));
-        actions.add(new ItemStackRequestAction.TakeAction(
-                craftableAmount * resultItem.amount(), // Total amount to take
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(50),
-                        (byte) 50,
-                        nextRequestId // TODO
-                ),
-                new ItemStackRequestSlotInfo(
-                        new FullContainerName(ContainerEnumName.CursorContainer, null),
-                        (byte) 0,
-                        0 // The stackNetworkId is not known yet
-                )
-        ));
+        if (action == ContainerInput.PICKUP) {
+            actions.add(new ItemStackRequestAction.TakeAction(
+                    resultItem.amount(),
+                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, nextRequestId),
+                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
+            ));
+        } else {
+            this.addInventoryTransferActions(actions, inventory, resultItem, craftableAmount * resultItem.amount(), nextRequestId);
+        }
 
         ItemStackRequestInfo request = new ItemStackRequestInfo(
                 nextRequestId,
@@ -198,10 +208,19 @@ public class StonecutterContainer extends ExperimentalContainer {
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
         ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
 
-        inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
-        BedrockItem newSrc = sourceItem.copy();
-        newSrc.setAmount(sourceItem.amount() - 1);
-        this.setItem(3, newSrc);
+        if (action == ContainerInput.PICKUP) {
+            if (cursorItem.isEmpty()) {
+                inventoryTracker.getHudContainer().setItem(0, resultItem.copy());
+            } else {
+                BedrockItem newCursorItem = cursorItem.copy();
+                newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
+                inventoryTracker.getHudContainer().setItem(0, newCursorItem);
+            }
+        } else {
+            this.addToInventory(inventory, resultItem, craftableAmount * resultItem.amount(), true);
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventory);
+        }
+        this.setItem(3, this.itemAfterRemovingAmount(sourceItem, toConsume));
 
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
 
@@ -263,7 +282,56 @@ public class StonecutterContainer extends ExperimentalContainer {
             }
         }
 
+        if (this.selectedRecipe >= this.currentRecipes.size()) {
+            this.selectedRecipe = 0;
+        }
         //TODO: update buttons
+    }
+
+    private void addInventoryTransferActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
+        int remaining = totalAmount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot = inventory.size() - 1; slot >= 0 && remaining > 0; slot--) {
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
+                        : Math.min(remaining, this.maxStackSize(resultItem));
+                actions.add(new ItemStackRequestAction.TakeAction(
+                        amountToMove,
+                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                ));
+                remaining -= amountToMove;
+            }
+        }
+    }
+
+    private int craftsThatFit(final InventoryContainer inventory, final BedrockItem resultItem, final int maxCrafts) {
+        int remainingResultItems = maxCrafts * resultItem.amount();
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot = inventory.size() - 1; slot >= 0 && remainingResultItems > 0; slot--) {
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
+                        continue;
+                    }
+                    remainingResultItems -= this.maxStackSize(resultItem) - destinationItem.amount();
+                } else if (destinationItem.isEmpty()) {
+                    remainingResultItems -= this.maxStackSize(resultItem);
+                }
+            }
+        }
+
+        final int fittingResultItems = maxCrafts * resultItem.amount() - Math.max(remainingResultItems, 0);
+        return fittingResultItems / resultItem.amount();
     }
 
 }

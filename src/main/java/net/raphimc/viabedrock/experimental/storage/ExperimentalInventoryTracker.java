@@ -84,21 +84,38 @@ public class ExperimentalInventoryTracker extends StoredObject {
         if (this.currentContainer != null && containerId == this.currentContainer.javaContainerId()) {
             return this.currentContainer;
         }
+        if (containerId == this.inventoryContainer.javaContainerId()) {
+            return this.inventoryContainer;
+        }
         return null;
     }
 
     public ExperimentalContainer getContainerFromName(final FullContainerName containerName, int slot) {
+        if (containerName == null) {
+            return null;
+        }
+        if (this.currentContainer != null) {
+            if (containerName.name() == ContainerEnumName.CreatedOutputContainer) {
+                return this.currentContainer;
+            }
+            try {
+                if (containerName.equals(this.currentContainer.getFullContainerName(slot))) {
+                    return this.currentContainer;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // The response slot may belong to a different container namespace.
+            }
+        }
         if (containerName.name() == ContainerEnumName.InventoryContainer) return this.inventoryContainer;
         if (containerName.name() == ContainerEnumName.HotbarContainer) return this.inventoryContainer;
         if (containerName.name() == ContainerEnumName.OffhandContainer) return this.offhandContainer;
         if (containerName.name() == ContainerEnumName.ArmorContainer) return this.armorContainer;
         if (containerName.name() == ContainerEnumName.CursorContainer) return this.hudContainer;
         if (containerName.name() == ContainerEnumName.CraftingInputContainer) return this.hudContainer;
+        if (containerName.name() == ContainerEnumName.CraftingOutputPreviewContainer) return this.hudContainer;
+        if (containerName.name() == ContainerEnumName.CreatedOutputContainer) return this.hudContainer;
         if (containerName.name() == ContainerEnumName.DynamicContainer) {
             return this.dynamicContainerRegistry.get(containerName);
-        }
-        if (this.currentContainer != null && containerName.equals(this.currentContainer.getFullContainerName(slot))) {
-            return this.currentContainer;
         }
         return null;
     }

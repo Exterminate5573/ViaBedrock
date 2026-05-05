@@ -53,8 +53,9 @@ public class CraftingDataTracker extends StoredObject {
         this.craftingDataList = craftingDataList;
     }
 
-    // TODO: Allow matching in 2x2 grid
     public CraftingDataStorage getRecipeData(ExperimentalContainer container, String tag) {
+        final int gridWidth = container.type() == net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType.HUD ? 2 : 3;
+        final int gridHeight = gridWidth;
         for (CraftingDataStorage craftingData : this.getCraftingDataList()) {
             if (craftingData.recipe() == null || !craftingData.recipe().getRecipeTag().equals(tag)) {
                 continue;
@@ -62,12 +63,12 @@ public class CraftingDataTracker extends StoredObject {
 
             switch (craftingData.type()) {
                 case SHAPELESS -> {
-                    if (matchShapelessRecipe(container, (ShapelessRecipe) craftingData.recipe())) {
+                    if (matchShapelessRecipe(container, (ShapelessRecipe) craftingData.recipe(), gridWidth * gridHeight)) {
                         return craftingData;
                     }
                 }
                 case SHAPED -> {
-                    if (matchShapedRecipe(container, (ShapedRecipe) craftingData.recipe())) {
+                    if (matchShapedRecipe(container, (ShapedRecipe) craftingData.recipe(), gridWidth, gridHeight)) {
                         return craftingData;
                     }
                 }
@@ -91,8 +92,12 @@ public class CraftingDataTracker extends StoredObject {
         return null;
     }
 
-    private boolean matchShapelessRecipe(ExperimentalContainer container, ShapelessRecipe recipe) {
-        boolean[] used = new boolean[9];
+    private boolean matchShapelessRecipe(ExperimentalContainer container, ShapelessRecipe recipe, int gridSize) {
+        if (recipe.getIngredients().size() > gridSize) {
+            return false;
+        }
+
+        boolean[] used = new boolean[gridSize];
         for (ItemDescriptor descriptor : recipe.getIngredients()) {
             if (!findMatchingSlot(container, descriptor, used)) {
                 return false;
@@ -101,13 +106,19 @@ public class CraftingDataTracker extends StoredObject {
         return noExtraItems(container, used);
     }
 
-    private boolean matchShapedRecipe(ExperimentalContainer container, ShapedRecipe recipe) {
+    private boolean matchShapedRecipe(ExperimentalContainer container, ShapedRecipe recipe, int gridWidth, int gridHeight) {
         int height = recipe.getPattern().length;
         int width = recipe.getPattern()[0].length;
+        if (width > gridWidth || height > gridHeight) {
+            return false;
+        }
 
-        for (int startY = 0; startY <= 3 - height; startY++) {
-            for (int startX = 0; startX <= 3 - width; startX++) {
-                if (checkPattern(container, recipe, startX, startY) && noExtraItemsOutsidePattern(container, startX, startY, width, height)) {
+        for (int startY = 0; startY <= gridHeight - height; startY++) {
+            for (int startX = 0; startX <= gridWidth - width; startX++) {
+                if (matchesPattern(container, recipe, startX, startY, gridWidth, false) && noExtraItemsOutsidePattern(container, startX, startY, width, height, gridWidth, gridHeight)) {
+                    return true;
+                }
+                if (recipe.isMirrored() && matchesPattern(container, recipe, startX, startY, gridWidth, true) && noExtraItemsOutsidePattern(container, startX, startY, width, height, gridWidth, gridHeight)) {
                     return true;
                 }
             }
@@ -116,7 +127,7 @@ public class CraftingDataTracker extends StoredObject {
     }
 
     private boolean findMatchingSlot(ExperimentalContainer container, ItemDescriptor descriptor, boolean[] used) {
-        for (int slot = 0; slot < 9; slot++) {
+        for (int slot = 0; slot < used.length; slot++) {
             if (used[slot]) continue;
             int inputSlot = container.bedrockSlot(slot + 1);
             BedrockItem item = container.getItem(inputSlot);
@@ -129,7 +140,7 @@ public class CraftingDataTracker extends StoredObject {
     }
 
     private boolean noExtraItems(ExperimentalContainer container, boolean[] used) {
-        for (int slot = 0; slot < 9; slot++) {
+        for (int slot = 0; slot < used.length; slot++) {
             int inputSlot = container.bedrockSlot(slot + 1);
             if (!used[slot] && !container.getItem(inputSlot).isEmpty()) {
                 return false;
@@ -138,14 +149,14 @@ public class CraftingDataTracker extends StoredObject {
         return true;
     }
 
-    private boolean checkPattern(ExperimentalContainer container, ShapedRecipe recipe, int startX, int startY) {
+    private boolean matchesPattern(ExperimentalContainer container, ShapedRecipe recipe, int startX, int startY, int gridWidth, boolean mirrored) {
         int height = recipe.getPattern().length;
         int width = recipe.getPattern()[0].length;
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                ItemDescriptor descriptor = recipe.getPattern()[y][x];
-                BedrockItem item = container.getItem(container.bedrockSlot((startY + y) * 3 + (startX + x) + 1));
+                ItemDescriptor descriptor = recipe.getPattern()[y][mirrored ? width - x - 1 : x];
+                BedrockItem item = container.getItem(container.bedrockSlot((startY + y) * gridWidth + (startX + x) + 1));
                 if (!descriptor.matchesItem(this.user(), item)) {
                     return false;
                 }
@@ -154,13 +165,13 @@ public class CraftingDataTracker extends StoredObject {
         return true;
     }
 
-    private boolean noExtraItemsOutsidePattern(ExperimentalContainer container, int startX, int startY, int width, int height) {
-        for (int gx = 0; gx < 3; gx++) {
-            for (int gy = 0; gy < 3; gy++) {
+    private boolean noExtraItemsOutsidePattern(ExperimentalContainer container, int startX, int startY, int width, int height, int gridWidth, int gridHeight) {
+        for (int gx = 0; gx < gridWidth; gx++) {
+            for (int gy = 0; gy < gridHeight; gy++) {
                 if (gx >= startX && gx < startX + width && gy >= startY && gy < startY + height) {
                     continue;
                 }
-                if (!container.getItem(container.bedrockSlot(gy * 3 + gx + 1)).isEmpty()) {
+                if (!container.getItem(container.bedrockSlot(gy * gridWidth + gx + 1)).isEmpty()) {
                     return false;
                 }
             }

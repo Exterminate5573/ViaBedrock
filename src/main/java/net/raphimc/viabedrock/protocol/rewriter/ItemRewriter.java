@@ -71,6 +71,7 @@ public class ItemRewriter extends StoredObject {
     private final Type<BedrockItem[]> itemArrayType;
     private final Type<BedrockItem> itemInstanceType;
     private final Type<BedrockItem[]> itemInstanceArrayType;
+    private final Int2ObjectMap<BedrockItem> javaToBedrockItems = new Int2ObjectOpenHashMap<>();
 
     static {
         // TODO: Add missing item nbt rewriters
@@ -114,6 +115,39 @@ public class ItemRewriter extends StoredObject {
 
         this.itemInstanceType = new BedrockItemType(this.items.getOrDefault("minecraft:shield", 0), this.blockItemValidBlockStates, false, false);
         this.itemInstanceArrayType = new ArrayType<>(this.itemInstanceType, BedrockTypes.UNSIGNED_VAR_INT);
+
+        this.populateJavaToBedrockItems(blockStateRewriter);
+    }
+
+    private void populateJavaToBedrockItems(final BlockStateRewriter blockStateRewriter) {
+        for (Map.Entry<String, Map<Integer, BedrockMappingData.JavaItemMapping>> entry : BedrockProtocol.MAPPINGS.getBedrockToJavaMetaItems().entrySet()) {
+            final Integer bedrockId = this.items.get(entry.getKey());
+            if (bedrockId == null) {
+                continue;
+            }
+            for (Map.Entry<Integer, BedrockMappingData.JavaItemMapping> metaEntry : entry.getValue().entrySet()) {
+                final int data = metaEntry.getKey() == null ? 0 : metaEntry.getKey();
+                final BedrockItem item = new BedrockItem(bedrockId, (short) data, (byte) 1);
+                this.javaToBedrockItems.putIfAbsent(metaEntry.getValue().id(), item);
+            }
+        }
+
+        for (Map.Entry<String, Map<BlockState, BedrockMappingData.JavaItemMapping>> entry : BedrockProtocol.MAPPINGS.getBedrockToJavaBlockItems().entrySet()) {
+            final Integer bedrockId = this.items.get(entry.getKey());
+            if (bedrockId == null) {
+                continue;
+            }
+            for (Map.Entry<BlockState, BedrockMappingData.JavaItemMapping> blockEntry : entry.getValue().entrySet()) {
+                final int blockRuntimeId = blockStateRewriter.bedrockId(blockEntry.getKey());
+                if (blockRuntimeId == -1) {
+                    continue;
+                }
+
+                final BedrockItem item = new BedrockItem(bedrockId);
+                item.setBlockRuntimeId(blockRuntimeId);
+                this.javaToBedrockItems.putIfAbsent(blockEntry.getValue().id(), item);
+            }
+        }
     }
 
     public Item javaItem(final BedrockItem bedrockItem) {
@@ -240,7 +274,20 @@ public class ItemRewriter extends StoredObject {
     }
 
     public BedrockItem bedrockItem(final Item javaItem) {
-        throw new UnsupportedOperationException("Translating Java items to Bedrock is not yet supported");
+        if (javaItem == null || javaItem.isEmpty()) {
+            return BedrockItem.empty();
+        }
+
+        final BedrockItem mappedItem = this.javaToBedrockItems.get(javaItem.identifier());
+        if (mappedItem == null) {
+            final String identifier = BedrockProtocol.MAPPINGS.getJavaItems().inverse().get(javaItem.identifier());
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Missing java -> bedrock item mapping for " + identifier + " (" + javaItem.identifier() + ")");
+            return BedrockItem.empty();
+        }
+
+        final BedrockItem bedrockItem = mappedItem.copy();
+        bedrockItem.setAmount(javaItem.amount());
+        return bedrockItem;
     }
 
     public BedrockItem[] bedrockItems(final Item[] javaItems) {

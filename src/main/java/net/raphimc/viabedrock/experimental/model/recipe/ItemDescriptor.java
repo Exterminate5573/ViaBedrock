@@ -27,6 +27,8 @@ import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public interface ItemDescriptor {
 
@@ -42,6 +44,17 @@ public interface ItemDescriptor {
 
     static boolean matchesAuxValue(final int auxValue, final BedrockItem item) {
         return auxValue == -1 || auxValue == Short.MAX_VALUE || auxValue == item.data() || auxValue == item.auxValue();
+    }
+
+    static Set<String> itemTags(final UserConnection user, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return Set.of();
+        }
+
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
+        final Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(itemName);
+        return tags == null ? Set.of() : tags;
     }
 
     default void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
@@ -61,8 +74,13 @@ public interface ItemDescriptor {
 
         @Override
         public boolean matchesItem(UserConnection user, BedrockItem item) {
-            // TODO
-            return false;
+            if (item.isEmpty()) {
+                return false;
+            }
+
+            final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+            final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
+            return name.equals(itemName) || ItemDescriptor.itemTags(user, item).contains(name);
         }
 
         @Override
@@ -126,14 +144,19 @@ public interface ItemDescriptor {
 
         @Override
         public boolean matchesItem(UserConnection user, BedrockItem item) {
-            // TODO
-            return false;
+            if (item.isEmpty()) {
+                return false;
+            }
+
+            final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+            final Integer itemId = itemRewriter.getItems().get(Key.namespaced(fullName));
+            return itemId != null && item.identifier() == itemId && ItemDescriptor.matchesAuxValue(auxValue, item);
         }
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
             ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-            int itemId = itemRewriter.getItems().get(fullName); //TODO: Check if this is correct
+            int itemId = itemRewriter.getItems().get(Key.namespaced(fullName));
             Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
             if (javaItem == null) {
                 throw new IllegalStateException("Could not find Java item for Bedrock ID: " + itemId);
@@ -186,14 +209,7 @@ public interface ItemDescriptor {
 
         @Override
         public boolean matchesItem(UserConnection user, BedrockItem item) {
-            if (item.isEmpty()) return false;
-            ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-            String itemName = itemRewriter.getItems().inverse().get(item.identifier());
-            Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(itemName);
-
-            if (tags == null || tags.isEmpty()) return false;
-
-            return tags.contains(itemTag);
+            return ItemDescriptor.itemTags(user, item).contains(itemTag);
         }
 
         @Override
@@ -211,6 +227,10 @@ public interface ItemDescriptor {
     }
 
     record MolangDescriptor(String tagExpression, int molangVersion, int amount) implements ItemDescriptor {
+        private static final Pattern ANY_TAG = Pattern.compile("(?:q|query)\\.any_tag\\(([^)]*)\\)");
+        private static final Pattern ALL_TAGS = Pattern.compile("(?:q|query)\\.all_tags\\(([^)]*)\\)");
+        private static final Pattern ITEM_NAME_ANY = Pattern.compile("(?:q|query)\\.is_item_name_any\\(([^)]*)\\)");
+        private static final Pattern QUOTED_ARGUMENT = Pattern.compile("'([^']+)'|\"([^\"]+)\"");
 
         public MolangDescriptor(final String tagExpression, final int molangVersion) {
             this(tagExpression, molangVersion, 1);
@@ -223,7 +243,35 @@ public interface ItemDescriptor {
 
         @Override
         public boolean matchesItem(UserConnection user, BedrockItem item) {
-            // TODO
+            if (item.isEmpty()) {
+                return false;
+            }
+
+            final Set<String> tags = ItemDescriptor.itemTags(user, item);
+            final Matcher anyTag = ANY_TAG.matcher(tagExpression);
+            if (anyTag.find()) {
+                for (String tag : readArguments(anyTag.group(1))) {
+                    if (tags.contains(tag)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            final Matcher allTags = ALL_TAGS.matcher(tagExpression);
+            if (allTags.find()) {
+                final Set<String> requiredTags = readArguments(allTags.group(1));
+                return !requiredTags.isEmpty() && tags.containsAll(requiredTags);
+            }
+
+            final Matcher itemNameAny = ITEM_NAME_ANY.matcher(tagExpression);
+            if (itemNameAny.find()) {
+                final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+                final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
+                final Set<String> names = readArguments(itemNameAny.group(1));
+                return names.contains(itemName);
+            }
+
             return false;
         }
 
@@ -232,6 +280,14 @@ public interface ItemDescriptor {
             return new MolangDescriptor(this.tagExpression, this.molangVersion, amount);
         }
 
+        private static Set<String> readArguments(final String arguments) {
+            final java.util.Set<String> values = new java.util.HashSet<>();
+            final Matcher matcher = QUOTED_ARGUMENT.matcher(arguments);
+            while (matcher.find()) {
+                values.add(matcher.group(1) != null ? matcher.group(1) : matcher.group(2));
+            }
+            return values;
+        }
     }
 
 }
