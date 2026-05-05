@@ -106,28 +106,32 @@ public class CraftingTableContainer extends ExperimentalContainer {
         }
 
         if (javaSlot == 0) {
-            final CraftingDataStorage craftingDataStorage = this.recipeData();
-            final BedrockItem resultItem = this.resultItem(craftingDataStorage);
+            final CraftingDataTracker.RecipeMatch recipeMatch = this.recipeMatch();
+            final BedrockItem resultItem = this.resultItem(recipeMatch);
             this.updateOutputSlot(revision, resultItem);
-            if (craftingDataStorage == null || resultItem.isEmpty()) {
+            if (recipeMatch == null || resultItem.isEmpty()) {
                 return false;
             }
 
             return switch (action) {
-                case PICKUP -> this.craftToCursor(revision, resultItem, craftingDataStorage);
-                case QUICK_MOVE -> this.craftToInventory(revision, resultItem, craftingDataStorage);
+                case PICKUP -> this.craftToCursor(revision, resultItem, recipeMatch);
+                case QUICK_MOVE -> this.craftToInventory(revision, resultItem, recipeMatch);
                 default -> false;
             };
         }
 
         final boolean result = super.handleClick(revision, javaSlot, button, action);
-        this.updateOutputSlot(revision, this.resultItem(this.recipeData()));
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
         return result;
     }
 
-    private CraftingDataStorage recipeData() {
+    private CraftingDataTracker.RecipeMatch recipeMatch() {
         final CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
-        return tracker.getRecipeData(this, "crafting_table");
+        return tracker.getRecipeMatch(this, "crafting_table");
+    }
+
+    private BedrockItem resultItem(final CraftingDataTracker.RecipeMatch recipeMatch) {
+        return recipeMatch == null ? BedrockItem.empty() : this.resultItem(recipeMatch.craftingData());
     }
 
     private BedrockItem resultItem(final CraftingDataStorage craftingDataStorage) {
@@ -157,7 +161,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
         containerSlot.send(BedrockProtocol.class);
     }
 
-    private boolean craftToCursor(final int revision, final BedrockItem resultItem, final CraftingDataStorage craftingDataStorage) {
+    private boolean craftToCursor(final int revision, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch) {
         final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         final BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
         if (!cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
@@ -166,7 +170,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
 
         final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
         final int requestId = inventoryRequestTracker.nextRequestId();
-        final List<ItemStackRequestAction> actions = this.craftActions(craftingDataStorage, resultItem, 1, requestId);
+        final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, 1, requestId);
         actions.add(new ItemStackRequestAction.TakeAction(
                 resultItem.amount(),
                 new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
@@ -189,14 +193,14 @@ public class CraftingTableContainer extends ExperimentalContainer {
             newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
             inventoryTracker.getHudContainer().setItem(0, newCursorItem);
         }
-        this.consumeIngredients(inventoryTracker, 1);
-        this.updateOutputSlot(revision, this.resultItem(this.recipeData()));
+        this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, 1);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
         return true;
     }
 
-    private boolean craftToInventory(final int revision, final BedrockItem resultItem, final CraftingDataStorage craftingDataStorage) {
-        final int maxCrafts = this.maxCrafts();
+    private boolean craftToInventory(final int revision, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch) {
+        final int maxCrafts = this.maxCrafts(recipeMatch.ingredients());
         if (maxCrafts <= 0) {
             return false;
         }
@@ -209,7 +213,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
 
         final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
         final int requestId = inventoryRequestTracker.nextRequestId();
-        final List<ItemStackRequestAction> actions = this.craftActions(craftingDataStorage, resultItem, crafts, requestId);
+        final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, crafts, requestId);
         this.addInventoryTransferActions(actions, inventoryTracker.getInventoryContainer(), resultItem, crafts * resultItem.amount(), requestId);
 
         final List<ExperimentalContainer> prevContainers = new ArrayList<>();
@@ -222,23 +226,23 @@ public class CraftingTableContainer extends ExperimentalContainer {
         ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
 
         this.addToInventory(inventoryTracker.getInventoryContainer(), resultItem, crafts * resultItem.amount(), true);
-        this.consumeIngredients(inventoryTracker, crafts);
-        this.updateOutputSlot(revision, this.resultItem(this.recipeData()));
+        this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, crafts);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
         return true;
     }
 
-    private List<ItemStackRequestAction> craftActions(final CraftingDataStorage craftingDataStorage, final BedrockItem resultItem, final int crafts, final int requestId) {
+    private List<ItemStackRequestAction> craftActions(final CraftingDataTracker.RecipeMatch recipeMatch, final BedrockItem resultItem, final int crafts, final int requestId) {
         final List<ItemStackRequestAction> actions = new ArrayList<>();
-        actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), crafts));
+        actions.add(new ItemStackRequestAction.CraftRecipeAction(recipeMatch.craftingData().networkId(), crafts));
         actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), crafts));
-        for (int i = 1; i <= 9; i++) {
-            final int inputSlot = this.bedrockSlot(i);
+        for (CraftingDataTracker.IngredientUse ingredient : recipeMatch.ingredients()) {
+            final int inputSlot = ingredient.bedrockSlot();
             final BedrockItem item = this.getItem(inputSlot);
             if (!item.isEmpty()) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(
-                        crafts,
+                        ingredient.count() * crafts,
                         new ItemStackRequestSlotInfo(this.getFullContainerName(inputSlot), (byte) inputSlot, item.netId() != null ? item.netId() : 0)
                 ));
             }
@@ -292,40 +296,45 @@ public class CraftingTableContainer extends ExperimentalContainer {
         return fittingResultItems / resultItem.amount();
     }
 
-    private int maxCrafts() {
+    private int maxCrafts(final List<CraftingDataTracker.IngredientUse> ingredients) {
         int maxCrafts = Integer.MAX_VALUE;
-        for (int i = 1; i <= 9; i++) {
-            final BedrockItem item = this.getItem(this.bedrockSlot(i));
-            if (!item.isEmpty()) {
-                maxCrafts = Math.min(maxCrafts, item.amount());
+        for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+            final BedrockItem item = this.getItem(ingredient.bedrockSlot());
+            if (!item.isEmpty() && ingredient.count() > 0) {
+                maxCrafts = Math.min(maxCrafts, item.amount() / ingredient.count());
             }
         }
         return maxCrafts == Integer.MAX_VALUE ? 0 : maxCrafts;
     }
 
-    private void consumeIngredients(final ExperimentalInventoryTracker inventoryTracker, final int crafts) {
+    private void consumeIngredients(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalInventoryTracker inventoryTracker, final int crafts) {
         for (int craft = 0; craft < crafts; craft++) {
-            for (int i = 1; i <= 9; i++) {
-                final int inputSlot = this.bedrockSlot(i);
-                final BedrockItem item = this.getItem(inputSlot);
-                if (item.isEmpty()) {
-                    continue;
+            for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+                for (int i = 0; i < ingredient.count(); i++) {
+                    this.consumeIngredient(ingredient.bedrockSlot(), inventoryTracker);
                 }
+            }
+        }
+    }
 
-                final BedrockItem remainder = this.craftingRemainder(item);
-                final BedrockItem newItem = this.itemAfterRemovingAmount(item, 1);
-                this.setItem(inputSlot, newItem);
-                if (!remainder.isEmpty()) {
-                    if (newItem.isEmpty()) {
-                        this.setItem(inputSlot, remainder);
-                    } else if (!newItem.isDifferent(remainder) && newItem.amount() < this.maxStackSize(newItem)) {
-                        final BedrockItem mergedItem = newItem.copy();
-                        mergedItem.setAmount(newItem.amount() + 1);
-                        this.setItem(inputSlot, mergedItem);
-                    } else {
-                        this.addToInventory(inventoryTracker.getInventoryContainer(), remainder, remainder.amount(), true);
-                    }
-                }
+    private void consumeIngredient(final int inputSlot, final ExperimentalInventoryTracker inventoryTracker) {
+        final BedrockItem item = this.getItem(inputSlot);
+        if (item.isEmpty()) {
+            return;
+        }
+
+        final BedrockItem remainder = this.craftingRemainder(item);
+        final BedrockItem newItem = this.itemAfterRemovingAmount(item, 1);
+        this.setItem(inputSlot, newItem);
+        if (!remainder.isEmpty()) {
+            if (newItem.isEmpty()) {
+                this.setItem(inputSlot, remainder);
+            } else if (!newItem.isDifferent(remainder) && newItem.amount() < this.maxStackSize(newItem)) {
+                final BedrockItem mergedItem = newItem.copy();
+                mergedItem.setAmount(newItem.amount() + remainder.amount());
+                this.setItem(inputSlot, mergedItem);
+            } else {
+                this.addToInventory(inventoryTracker.getInventoryContainer(), remainder, remainder.amount(), true);
             }
         }
     }
@@ -333,6 +342,11 @@ public class CraftingTableContainer extends ExperimentalContainer {
     private BedrockItem craftingRemainder(final BedrockItem item) {
         final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
         final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
+        if ("minecraft:written_book".equals(itemName) || (itemName != null && itemName.endsWith("_banner") && item.tag() != null && item.tag().contains("Patterns"))) {
+            final BedrockItem remainder = item.copy();
+            remainder.setAmount(1);
+            return remainder;
+        }
         final String remainderName = switch (itemName) {
             case "minecraft:water_bucket", "minecraft:lava_bucket", "minecraft:milk_bucket" -> "minecraft:bucket";
             case "minecraft:dragon_breath", "minecraft:honey_bottle" -> "minecraft:glass_bottle";

@@ -313,8 +313,94 @@ public class ItemRewriter extends StoredObject {
             return Math.max(1, itemDefinition.maxStackSize());
         }
 
-        CompoundTag item = BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier);
-        return item.getInt("maxStackSize", 64);
+        final CompoundTag item = BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier);
+        if (item != null && item.contains("maxStackSize")) {
+            return item.getInt("maxStackSize", 64);
+        }
+
+        return vanillaMaxStackSize(identifier);
+    }
+
+    private static int vanillaMaxStackSize(final String identifier) {
+        final String item = Key.stripMinecraftNamespace(identifier);
+        if (item.equals("ender_pearl")
+                || item.equals("snowball")
+                || item.equals("egg")
+                || item.equals("honey_bottle")
+                || item.equals("armor_stand")
+                || item.equals("written_book")
+                || item.endsWith("_sign")
+                || item.endsWith("_hanging_sign")
+                || item.endsWith("_banner")) {
+            return 16;
+        }
+
+        if (item.endsWith("_bed")
+                || item.endsWith("_boat")
+                || item.endsWith("_chest_boat")
+                || item.endsWith("_minecart")
+                || item.endsWith("_bucket")
+                || item.endsWith("_sword")
+                || item.endsWith("_shovel")
+                || item.endsWith("_pickaxe")
+                || item.endsWith("_axe")
+                || item.endsWith("_hoe")
+                || item.endsWith("_spear")
+                || item.endsWith("_helmet")
+                || item.endsWith("_chestplate")
+                || item.endsWith("_leggings")
+                || item.endsWith("_boots")
+                || item.endsWith("_horse_armor")
+                || item.equals("wolf_armor")
+                || item.startsWith("music_disc_")
+                || item.equals("bow")
+                || item.equals("crossbow")
+                || item.equals("trident")
+                || item.equals("shield")
+                || item.equals("mace")
+                || item.equals("shears")
+                || item.equals("brush")
+                || item.equals("flint_and_steel")
+                || item.equals("fishing_rod")
+                || item.equals("carrot_on_a_stick")
+                || item.equals("warped_fungus_on_a_stick")
+                || item.equals("saddle")
+                || item.equals("elytra")
+                || item.equals("enchanted_book")
+                || item.equals("potion")
+                || item.equals("splash_potion")
+                || item.equals("lingering_potion")
+                || item.equals("ominous_bottle")
+                || item.equals("mushroom_stew")
+                || item.equals("rabbit_stew")
+                || item.equals("beetroot_soup")
+                || item.equals("suspicious_stew")
+                || item.equals("cake")
+                || item.equals("totem_of_undying")
+                || item.equals("goat_horn")
+                || item.equals("spyglass")
+                || item.equals("bundle")
+                || item.equals("white_shulker_box")
+                || item.equals("orange_shulker_box")
+                || item.equals("magenta_shulker_box")
+                || item.equals("light_blue_shulker_box")
+                || item.equals("yellow_shulker_box")
+                || item.equals("lime_shulker_box")
+                || item.equals("pink_shulker_box")
+                || item.equals("gray_shulker_box")
+                || item.equals("light_gray_shulker_box")
+                || item.equals("cyan_shulker_box")
+                || item.equals("purple_shulker_box")
+                || item.equals("blue_shulker_box")
+                || item.equals("brown_shulker_box")
+                || item.equals("green_shulker_box")
+                || item.equals("red_shulker_box")
+                || item.equals("black_shulker_box")
+                || item.equals("shulker_box")) {
+            return 1;
+        }
+
+        return 64;
     }
 
     public BiMap<String, Integer> getItems() {

@@ -181,9 +181,7 @@ public abstract class ExperimentalContainer {
             return this.handlePickupTake(clickContext, container, bedrockSlot, button, item);
         }
 
-        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
-
-        if (item.isEmpty() || (!item.isDifferent(cursorItem) && item.amount() < itemRewriter.maxStackSize(item))) {
+        if (item.isEmpty() || (!item.isDifferent(cursorItem) && item.amount() < this.maxStackSize(cursorItem))) {
             return this.handlePickupPlace(clickContext, container, bedrockSlot, button, cursorItem, item);
         }
 
@@ -208,7 +206,7 @@ public abstract class ExperimentalContainer {
 
     private ItemStackRequestAction handlePickupPlace(final ClickContext clickContext, final ExperimentalContainer container, final int bedrockSlot, final byte button, final BedrockItem cursorItem, final BedrockItem item) {
         int amt = button == 0 ? cursorItem.amount() : 1;
-        int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(64 - item.amount(), cursorItem.amount());
+        int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(this.maxStackSize(cursorItem) - item.amount(), cursorItem.amount());
 
         final int containerNetId = this.stackNetId(item);
         BedrockItem finalContainerItem = item.copy();
@@ -245,8 +243,8 @@ public abstract class ExperimentalContainer {
     }
 
     private ItemStackRequestAction handleSwapClick(final ClickContext clickContext, final short javaSlot, final byte button) {
-        if (button < 0 || button > 8) {
-            // TODO: Handle offhand
+        final boolean offhandSwap = button == 40;
+        if (!offhandSwap && (button < 0 || button > 8)) {
             return null;
         }
 
@@ -260,39 +258,40 @@ public abstract class ExperimentalContainer {
         clickContext.container = container;
         clickContext.bedrockSlot = source.bedrockSlot();
 
-        ExperimentalContainer hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
-        if (container == hotbarContainer && clickContext.bedrockSlot == button) {
+        ExperimentalContainer swapContainer = offhandSwap ? clickContext.inventoryTracker.getOffhandContainer() : clickContext.inventoryTracker.getInventoryContainer();
+        final int swapBedrockSlot = offhandSwap ? 0 : button;
+        if (container == swapContainer && clickContext.bedrockSlot == swapBedrockSlot) {
             return null;
         }
         this.addPrevContainer(clickContext, container);
-        this.addPrevContainer(clickContext, hotbarContainer);
+        this.addPrevContainer(clickContext, swapContainer);
 
         BedrockItem item = container.getItem(clickContext.bedrockSlot).copy();
-        BedrockItem hotbarItem = hotbarContainer.getItem(button).copy();
+        BedrockItem swapItem = swapContainer.getItem(swapBedrockSlot).copy();
 
-        if (item.isEmpty() && hotbarItem.isEmpty()) {
+        if (item.isEmpty() && swapItem.isEmpty()) {
             return null;
         }
 
-        container.setItem(clickContext.bedrockSlot, hotbarItem);
-        hotbarContainer.setItem(button, item);
+        container.setItem(clickContext.bedrockSlot, swapItem);
+        swapContainer.setItem(swapBedrockSlot, item);
 
-        if (hotbarItem.isEmpty()) {
+        if (swapItem.isEmpty()) {
             return new ItemStackRequestAction.PlaceAction(
                     item.amount(),
                     new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, this.stackNetId(item)),
-                    new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, 0)
+                    new ItemStackRequestSlotInfo(swapContainer.getFullContainerName(swapBedrockSlot), (byte) swapBedrockSlot, 0)
             );
         } else if (item.isEmpty()) {
             return new ItemStackRequestAction.PlaceAction(
-                    hotbarItem.amount(),
-                    new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, this.stackNetId(hotbarItem)),
+                    swapItem.amount(),
+                    new ItemStackRequestSlotInfo(swapContainer.getFullContainerName(swapBedrockSlot), (byte) swapBedrockSlot, this.stackNetId(swapItem)),
                     new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, 0)
             );
         }
 
         return new ItemStackRequestAction.SwapAction(
-                new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, this.stackNetId(hotbarItem)),
+                new ItemStackRequestSlotInfo(swapContainer.getFullContainerName(swapBedrockSlot), (byte) swapBedrockSlot, this.stackNetId(swapItem)),
                 new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, this.stackNetId(item))
         );
     }
@@ -371,7 +370,7 @@ public abstract class ExperimentalContainer {
     }
 
     protected int maxStackSize(final BedrockItem item) {
-        return 64;
+        return this.user.get(ItemRewriter.class).maxStackSize(item);
     }
 
     private void addPrevContainer(final ClickContext clickContext, final ExperimentalContainer container) {

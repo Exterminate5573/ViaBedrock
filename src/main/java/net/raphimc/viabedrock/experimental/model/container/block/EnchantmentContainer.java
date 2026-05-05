@@ -18,12 +18,11 @@
 package net.raphimc.viabedrock.experimental.model.container.block;
 
 import com.viaversion.nbt.tag.CompoundTag;
+import com.viaversion.nbt.tag.ListTag;
 import com.viaversion.nbt.tag.ShortTag;
-import com.viaversion.nbt.tag.Tag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
-import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.data.Enchantments1_20_5;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.util.RegistryUtil;
 import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
@@ -40,6 +39,7 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 
 import java.util.ArrayList;
@@ -114,6 +114,16 @@ public class EnchantmentContainer extends ExperimentalContainer {
         ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
         EntityTracker entityTracker  = user.get(EntityTracker.class);
+        final BedrockItem inputItem = this.getItem(14);
+        final BedrockItem materialItem = this.getItem(15);
+        final boolean survivalLike = entityTracker.getClientPlayer().gameType() == GameType.Survival || entityTracker.getClientPlayer().gameType() == GameType.Adventure;
+        final int materialCost = button + 1;
+        if (inputItem.isEmpty()) {
+            return false;
+        }
+        if (survivalLike && materialItem.amount() < materialCost) {
+            return false;
+        }
 
         final List<ExperimentalContainer> prevContainers = new ArrayList<>();
         final ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
@@ -121,12 +131,14 @@ public class EnchantmentContainer extends ExperimentalContainer {
         prevContainers.add(this.copy());
 
         int reqId = inventoryRequestTracker.nextRequestId();
+        final BedrockItem resultItem = this.enchantedResult(inputItem, this.data.get(button));
 
         List<ItemStackRequestAction> actions = new ArrayList<>();
 
         ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(this.data.get(button).netId(), 1);
+        ItemStackRequestAction craftResultsAction = new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1);
         ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                this.getFullContainerName(14), (byte) 14, this.getItem(14).netId()
+                this.getFullContainerName(14), (byte) 14, this.stackNetId(inputItem)
         ));
         ItemStackRequestAction placeAction = new ItemStackRequestAction.PlaceAction(1,
                 new ItemStackRequestSlotInfo(
@@ -137,28 +149,16 @@ public class EnchantmentContainer extends ExperimentalContainer {
                 )
         );
         actions.add(craftAction);
+        actions.add(craftResultsAction);
         actions.add(consumeAction);
         actions.add(placeAction);
 
-        if (entityTracker.getClientPlayer().gameType() == GameType.Survival || entityTracker.getClientPlayer().gameType() == GameType.Adventure) {
-            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(button + 1, new ItemStackRequestSlotInfo(
-                    this.getFullContainerName(15), (byte) 15, this.getItem(15).netId()
+        if (survivalLike) {
+            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(materialCost, new ItemStackRequestSlotInfo(
+                    this.getFullContainerName(15), (byte) 15, this.stackNetId(materialItem)
             ));
             actions.add(consumeAction2);
-
-            this.setItem(15, this.itemAfterRemovingAmount(this.getItem(15), button + 1));
         }
-
-        /* FIXME
-        BedrockItem item = this.getItem(14).copy();
-        CompoundTag tag = item.tag() != null ? item.tag().copy() : new CompoundTag();
-        CompoundTag enchant = new CompoundTag();
-        enchant.put("id", new ShortTag((short) this.data.get(button).type().getValue()));
-        enchant.put("lvl", new ShortTag((short) this.data.get(button).level()));
-        tag.put("ench", enchant);
-        item.setTag(tag);
-        this.setItem(14, item);
-        */
 
         ItemStackRequestInfo request = new ItemStackRequestInfo(
                 reqId,
@@ -170,7 +170,41 @@ public class EnchantmentContainer extends ExperimentalContainer {
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, 0, prevCursorContainer, prevContainers)); // Store the request to track it later
         ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
 
+        this.setItem(14, resultItem);
+        if (survivalLike) {
+            this.setItem(15, this.itemAfterRemovingAmount(materialItem, materialCost));
+        }
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+
         return true;
+    }
+
+    private BedrockItem enchantedResult(final BedrockItem inputItem, final EnchantData enchantData) {
+        final BedrockItem resultItem = inputItem.copy();
+        resultItem.setAmount(1);
+
+        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
+        final String identifier = itemRewriter.getItems().inverse().get(resultItem.identifier());
+        if ("minecraft:book".equals(identifier)) {
+            final Integer enchantedBookId = itemRewriter.getItems().get("minecraft:enchanted_book");
+            if (enchantedBookId != null) {
+                resultItem.setIdentifier(enchantedBookId);
+            }
+        }
+
+        final CompoundTag tag = resultItem.tag() != null ? resultItem.tag().copy() : new CompoundTag();
+        ListTag<CompoundTag> enchantments = tag.getListTag("ench", CompoundTag.class);
+        if (enchantments == null) {
+            enchantments = new ListTag<>(CompoundTag.class);
+            tag.put("ench", enchantments);
+        }
+
+        final CompoundTag enchantment = new CompoundTag();
+        enchantment.put("id", new ShortTag((short) enchantData.type().getValue()));
+        enchantment.put("lvl", new ShortTag((short) enchantData.level()));
+        enchantments.add(enchantment);
+        resultItem.setTag(tag);
+        return resultItem;
     }
 
     public void setEnchantData(List<EnchantData> data) {

@@ -62,7 +62,6 @@ public interface ItemDescriptor {
     }
 
     record ComplexAliasDescriptor(String name, int amount) implements ItemDescriptor {
-
         public ComplexAliasDescriptor(final String name) {
             this(name, 1);
         }
@@ -109,7 +108,6 @@ public interface ItemDescriptor {
     }
 
     record DefaultDescriptor(int itemId, int auxValue, int amount) implements ItemDescriptor {
-
         public DefaultDescriptor(final int itemId, final int auxValue) {
             this(itemId, auxValue, 1);
         }
@@ -146,7 +144,6 @@ public interface ItemDescriptor {
     }
 
     record DeferredDescriptor(String fullName, int auxValue, int amount) implements ItemDescriptor {
-
         public DeferredDescriptor(final String fullName, final int auxValue) {
             this(fullName, auxValue, 1);
         }
@@ -217,7 +214,6 @@ public interface ItemDescriptor {
     }
 
     record ItemTagDescriptor(String itemTag, int amount) implements ItemDescriptor {
-
         public ItemTagDescriptor(final String itemTag) {
             this(itemTag, 1);
         }
@@ -247,14 +243,14 @@ public interface ItemDescriptor {
     }
 
     record MolangDescriptor(String tagExpression, int molangVersion, int amount) implements ItemDescriptor {
+        public MolangDescriptor(final String tagExpression, final int molangVersion) {
+            this(tagExpression, molangVersion, 1);
+        }
+
         private static final Pattern ANY_TAG = Pattern.compile("(?:q|query)\\.any_tag\\(([^)]*)\\)");
         private static final Pattern ALL_TAGS = Pattern.compile("(?:q|query)\\.all_tags\\(([^)]*)\\)");
         private static final Pattern ITEM_NAME_ANY = Pattern.compile("(?:q|query)\\.is_item_name_any\\(([^)]*)\\)");
         private static final Pattern QUOTED_ARGUMENT = Pattern.compile("'([^']+)'|\"([^\"]+)\"");
-
-        public MolangDescriptor(final String tagExpression, final int molangVersion) {
-            this(tagExpression, molangVersion, 1);
-        }
 
         @Override
         public ItemDescriptorType getType() {

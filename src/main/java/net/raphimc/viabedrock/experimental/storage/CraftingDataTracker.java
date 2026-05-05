@@ -35,11 +35,19 @@ import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CraftingDataTracker extends StoredObject {
 
     private List<CraftingDataStorage> craftingDataList = new ArrayList<>();
+
+    public record IngredientUse(int bedrockSlot, int count) {
+    }
+
+    public record RecipeMatch(CraftingDataStorage craftingData, List<IngredientUse> ingredients) {
+    }
 
     public CraftingDataTracker(UserConnection user) {
         super(user);
@@ -54,6 +62,11 @@ public class CraftingDataTracker extends StoredObject {
     }
 
     public CraftingDataStorage getRecipeData(ExperimentalContainer container, String tag) {
+        final RecipeMatch match = this.getRecipeMatch(container, tag);
+        return match != null ? match.craftingData() : null;
+    }
+
+    public RecipeMatch getRecipeMatch(ExperimentalContainer container, String tag) {
         final int gridWidth = container.type() == net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType.HUD ? 2 : 3;
         final int gridHeight = gridWidth;
         for (CraftingDataStorage craftingData : this.getCraftingDataList()) {
@@ -62,26 +75,29 @@ public class CraftingDataTracker extends StoredObject {
             }
 
             switch (craftingData.type()) {
-                case SHAPELESS -> {
-                    if (matchShapelessRecipe(container, (ShapelessRecipe) craftingData.recipe(), gridWidth * gridHeight)) {
-                        return craftingData;
+                case SHAPELESS, USER_DATA_SHAPELESS -> {
+                    final List<IngredientUse> ingredients = matchShapelessRecipe(container, (ShapelessRecipe) craftingData.recipe(), gridWidth * gridHeight);
+                    if (ingredients != null) {
+                        return new RecipeMatch(craftingData, ingredients);
                     }
                 }
                 case SHAPED -> {
-                    if (matchShapedRecipe(container, (ShapedRecipe) craftingData.recipe(), gridWidth, gridHeight)) {
-                        return craftingData;
+                    final List<IngredientUse> ingredients = matchShapedRecipe(container, (ShapedRecipe) craftingData.recipe(), gridWidth, gridHeight);
+                    if (ingredients != null) {
+                        return new RecipeMatch(craftingData, ingredients);
                     }
-                }
-                case USER_DATA_SHAPELESS -> {
-                    // TODO: Not supported yet
                 }
                 case SMITHING_TRIM, SMITHING_TRANSFORM -> {
                     // TODO: Hard coded slots for Smithing Container
                     SmithingRecipe smithingRecipe = (SmithingRecipe) craftingData.recipe();
-                    if (smithingRecipe.getTemplate().matchesItem(this.user(), container.getItem(53)) &&
-                            smithingRecipe.getBaseIngredient().matchesItem(this.user(), container.getItem(51)) &&
-                            smithingRecipe.getAdditionIngredient().matchesItem(this.user(), container.getItem(52))) {
-                        return craftingData;
+                    if (matchesIngredient(container.getItem(53), smithingRecipe.getTemplate(), 0) &&
+                            matchesIngredient(container.getItem(51), smithingRecipe.getBaseIngredient(), 0) &&
+                            matchesIngredient(container.getItem(52), smithingRecipe.getAdditionIngredient(), 0)) {
+                        return new RecipeMatch(craftingData, List.of(
+                                new IngredientUse(53, smithingRecipe.getTemplate().amount()),
+                                new IngredientUse(51, smithingRecipe.getBaseIngredient().amount()),
+                                new IngredientUse(52, smithingRecipe.getAdditionIngredient().amount())
+                        ));
                     }
                 }
                 default -> ViaBedrock.getPlatform().getLogger().warning(
@@ -92,77 +108,114 @@ public class CraftingDataTracker extends StoredObject {
         return null;
     }
 
-    private boolean matchShapelessRecipe(ExperimentalContainer container, ShapelessRecipe recipe, int gridSize) {
+    private List<IngredientUse> matchShapelessRecipe(ExperimentalContainer container, ShapelessRecipe recipe, int gridSize) {
         if (recipe.getIngredients().size() > gridSize) {
-            return false;
+            return null;
         }
 
-        boolean[] used = new boolean[gridSize];
-        for (ItemDescriptor descriptor : recipe.getIngredients()) {
-            if (!findMatchingSlot(container, descriptor, used)) {
-                return false;
-            }
+        final int[] usedCounts = new int[gridSize];
+        if (!findMatchingSlots(container, recipe.getIngredients(), usedCounts, 0)) {
+            return null;
         }
-        return noExtraItems(container, used);
+        return noExtraItems(container, usedCounts) ? ingredientUses(container, usedCounts) : null;
     }
 
-    private boolean matchShapedRecipe(ExperimentalContainer container, ShapedRecipe recipe, int gridWidth, int gridHeight) {
+    private List<IngredientUse> matchShapedRecipe(ExperimentalContainer container, ShapedRecipe recipe, int gridWidth, int gridHeight) {
         int height = recipe.getPattern().length;
         int width = recipe.getPattern()[0].length;
         if (width > gridWidth || height > gridHeight) {
-            return false;
+            return null;
         }
 
         for (int startY = 0; startY <= gridHeight - height; startY++) {
             for (int startX = 0; startX <= gridWidth - width; startX++) {
-                if (matchesPattern(container, recipe, startX, startY, gridWidth, false) && noExtraItemsOutsidePattern(container, startX, startY, width, height, gridWidth, gridHeight)) {
-                    return true;
+                List<IngredientUse> ingredients = matchesPattern(container, recipe, startX, startY, gridWidth, false);
+                if (ingredients != null && noExtraItemsOutsidePattern(container, startX, startY, width, height, gridWidth, gridHeight)) {
+                    return ingredients;
                 }
-                if (recipe.isMirrored() && matchesPattern(container, recipe, startX, startY, gridWidth, true) && noExtraItemsOutsidePattern(container, startX, startY, width, height, gridWidth, gridHeight)) {
-                    return true;
+                if (recipe.isMirrored()) {
+                    ingredients = matchesPattern(container, recipe, startX, startY, gridWidth, true);
+                    if (ingredients != null && noExtraItemsOutsidePattern(container, startX, startY, width, height, gridWidth, gridHeight)) {
+                        return ingredients;
+                    }
                 }
             }
         }
-        return false;
+        return null;
     }
 
-    private boolean findMatchingSlot(ExperimentalContainer container, ItemDescriptor descriptor, boolean[] used) {
-        for (int slot = 0; slot < used.length; slot++) {
-            if (used[slot]) continue;
+    private boolean findMatchingSlots(final ExperimentalContainer container, final List<ItemDescriptor> descriptors, final int[] usedCounts, final int descriptorIndex) {
+        if (descriptorIndex >= descriptors.size()) {
+            return true;
+        }
+
+        final ItemDescriptor descriptor = descriptors.get(descriptorIndex);
+        for (int slot = 0; slot < usedCounts.length; slot++) {
+            if (usedCounts[slot] > 0) {
+                continue;
+            }
+
             int inputSlot = container.bedrockSlot(slot + 1);
             BedrockItem item = container.getItem(inputSlot);
-            if (descriptor.matchesItem(this.user(), item)) {
-                used[slot] = true;
-                return true;
+            if (matchesIngredient(item, descriptor, usedCounts[slot])) {
+                usedCounts[slot] += descriptor.amount();
+                if (findMatchingSlots(container, descriptors, usedCounts, descriptorIndex + 1)) {
+                    return true;
+                }
+                usedCounts[slot] -= descriptor.amount();
             }
         }
         return false;
     }
 
-    private boolean noExtraItems(ExperimentalContainer container, boolean[] used) {
-        for (int slot = 0; slot < used.length; slot++) {
+    private boolean noExtraItems(ExperimentalContainer container, int[] usedCounts) {
+        for (int slot = 0; slot < usedCounts.length; slot++) {
             int inputSlot = container.bedrockSlot(slot + 1);
-            if (!used[slot] && !container.getItem(inputSlot).isEmpty()) {
+            if (usedCounts[slot] == 0 && !container.getItem(inputSlot).isEmpty()) {
                 return false;
             }
         }
         return true;
     }
 
-    private boolean matchesPattern(ExperimentalContainer container, ShapedRecipe recipe, int startX, int startY, int gridWidth, boolean mirrored) {
+    private List<IngredientUse> ingredientUses(final ExperimentalContainer container, final int[] usedCounts) {
+        final List<IngredientUse> ingredients = new ArrayList<>();
+        for (int slot = 0; slot < usedCounts.length; slot++) {
+            if (usedCounts[slot] > 0) {
+                ingredients.add(new IngredientUse(container.bedrockSlot(slot + 1), usedCounts[slot]));
+            }
+        }
+        return ingredients;
+    }
+
+    private List<IngredientUse> matchesPattern(ExperimentalContainer container, ShapedRecipe recipe, int startX, int startY, int gridWidth, boolean mirrored) {
         int height = recipe.getPattern().length;
         int width = recipe.getPattern()[0].length;
+        final Map<Integer, Integer> ingredients = new LinkedHashMap<>();
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 ItemDescriptor descriptor = recipe.getPattern()[y][mirrored ? width - x - 1 : x];
-                BedrockItem item = container.getItem(container.bedrockSlot((startY + y) * gridWidth + (startX + x) + 1));
-                if (!descriptor.matchesItem(this.user(), item)) {
-                    return false;
+                final int bedrockSlot = container.bedrockSlot((startY + y) * gridWidth + (startX + x) + 1);
+                BedrockItem item = container.getItem(bedrockSlot);
+                if (!matchesIngredient(item, descriptor, 0)) {
+                    return null;
+                }
+                if (descriptor.amount() > 0 && !item.isEmpty()) {
+                    ingredients.merge(bedrockSlot, descriptor.amount(), Integer::sum);
                 }
             }
         }
-        return true;
+        return ingredients.entrySet().stream()
+                .map(entry -> new IngredientUse(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private boolean matchesIngredient(final BedrockItem item, final ItemDescriptor descriptor, final int alreadyUsed) {
+        if (!descriptor.matchesItem(this.user(), item)) {
+            return false;
+        }
+        return item.isEmpty() || item.amount() - alreadyUsed >= descriptor.amount();
     }
 
     private boolean noExtraItemsOutsidePattern(ExperimentalContainer container, int startX, int startY, int width, int height, int gridWidth, int gridHeight) {

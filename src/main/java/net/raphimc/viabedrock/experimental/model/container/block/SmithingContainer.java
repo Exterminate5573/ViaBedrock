@@ -201,11 +201,16 @@ public class SmithingContainer extends ExperimentalContainer {
             return BedrockItem.empty();
         }
 
+        final BedrockItem outputItem = this.getItem(50);
+        if (!outputItem.isEmpty()) {
+            return outputItem;
+        }
+
         final BedrockItem recipeResult = ((SmithingRecipe) craftingDataStorage.recipe()).getResult();
         if (!recipeResult.isEmpty()) {
             return recipeResult;
         }
-        return this.getItem(RESULT_SLOT);
+        return BedrockItem.empty();
     }
 
     private void updateOutputSlot(final int revision, final BedrockItem resultItem) {

@@ -31,7 +31,7 @@ import net.raphimc.viabedrock.experimental.model.container.player.InventoryConta
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
-import net.raphimc.viabedrock.experimental.model.recipe.ShapedRecipe;
+import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapelessRecipe;
 import net.raphimc.viabedrock.experimental.storage.*;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
@@ -52,6 +52,7 @@ public class StonecutterContainer extends ExperimentalContainer {
 
     private final List<CraftingDataStorage> currentRecipes = new ArrayList<>();
     private int selectedRecipe = 0;
+    private BedrockItem lastRecipeInput = BedrockItem.empty();
 
     public StonecutterContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
         super(user, containerId, ContainerType.STONECUTTER, title, position, 2, "stonecutter_block", "stonecutter");
@@ -120,6 +121,7 @@ public class StonecutterContainer extends ExperimentalContainer {
 
         if (javaSlot == 0 || javaSlot == 1) {
             this.updateRecipeData(this.getItem(3));
+            this.updateOutputSlot(revision, this.selectedResultItem());
         } else {
             return result;
         }
@@ -131,23 +133,8 @@ public class StonecutterContainer extends ExperimentalContainer {
             this.selectedRecipe = 0;
         }
 
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
         final CraftingDataStorage craftingDataStorage = this.currentRecipes.get(this.selectedRecipe);
-        BedrockItem resultItem = BedrockItem.empty();
-        if (craftingDataStorage != null) {
-            // Valid recipe found, show output
-            switch (craftingDataStorage.type()) {
-                case SHAPELESS -> resultItem = ((ShapelessRecipe) craftingDataStorage.recipe()).getResults().get(0);
-                default -> ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown recipe type for stonecutter: " + craftingDataStorage.type());
-            }
-        }
-
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
-        containerSlot.write(Types.VAR_INT, (int) this.containerId());
-        containerSlot.write(Types.VAR_INT, 0); // Revision
-        containerSlot.write(Types.SHORT, (short) 1); // Output slot
-        containerSlot.write(VersionedTypes.V1_21_11.item, itemRewriter.javaItem(resultItem));
-        containerSlot.send(BedrockProtocol.class);
+        final BedrockItem resultItem = this.selectedResultItem();
 
         if (javaSlot != 1) {
             return result;
@@ -172,11 +159,13 @@ public class StonecutterContainer extends ExperimentalContainer {
             return false;
         }
 
-        int craftableAmount = action == ContainerInput.QUICK_MOVE ? Math.min(sourceItem.amount(), this.craftsThatFit(inventory, resultItem, sourceItem.amount())) : 1;
+        final int inputCost = this.inputCost(craftingDataStorage);
+        final int maxCraftsByInput = sourceItem.amount() / inputCost;
+        int craftableAmount = action == ContainerInput.QUICK_MOVE ? Math.min(maxCraftsByInput, this.craftsThatFit(inventory, resultItem, maxCraftsByInput)) : 1;
         if (craftableAmount <= 0) {
             return false;
         }
-        int toConsume = Math.min(sourceItem.amount(), craftableAmount);
+        int toConsume = inputCost * craftableAmount;
 
         List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
@@ -223,9 +212,9 @@ public class StonecutterContainer extends ExperimentalContainer {
         }
         this.setItem(3, this.itemAfterRemovingAmount(sourceItem, toConsume));
 
-        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
-
         this.updateRecipeData(this.getItem(3));
+        this.updateOutputSlot(revision, this.selectedResultItem());
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
         return true;
     }
 
@@ -238,24 +227,7 @@ public class StonecutterContainer extends ExperimentalContainer {
         }
 
         this.selectedRecipe = button;
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-
-        final CraftingDataStorage craftingDataStorage = this.currentRecipes.get(button);
-        BedrockItem resultItem = BedrockItem.empty();
-        if (craftingDataStorage != null) {
-            // Valid recipe found, show output
-            switch (craftingDataStorage.type()) {
-                case SHAPELESS -> resultItem = ((ShapelessRecipe) craftingDataStorage.recipe()).getResults().get(0);
-                default -> ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown recipe type for stonecutter: " + craftingDataStorage.type());
-            }
-        }
-
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
-        containerSlot.write(Types.VAR_INT, (int) this.containerId());
-        containerSlot.write(Types.VAR_INT, 0); // Revision
-        containerSlot.write(Types.SHORT, (short) 1); // Output slot
-        containerSlot.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(resultItem));
-        containerSlot.send(BedrockProtocol.class);
+        this.updateOutputSlot(0, this.selectedResultItem());
 
         return true;
     }
@@ -263,6 +235,10 @@ public class StonecutterContainer extends ExperimentalContainer {
     // TODO: Refactor to CraftingDataTracker
     private void updateRecipeData(BedrockItem item) {
         CraftingDataTracker craftingDataTracker = user.get(CraftingDataTracker.class);
+        if (this.lastRecipeInput.isDifferent(item)) {
+            this.selectedRecipe = 0;
+            this.lastRecipeInput = item.copy();
+        }
         this.currentRecipes.clear();
 
         for (CraftingDataStorage craftingData : craftingDataTracker.getCraftingDataList()) {
@@ -273,7 +249,12 @@ public class StonecutterContainer extends ExperimentalContainer {
             switch (craftingData.type()) {
                 case SHAPELESS -> {
                     ShapelessRecipe recipe = (ShapelessRecipe) craftingData.recipe();
-                    if (recipe.getIngredients().get(0).matchesItem(this.user, item)) {
+                    if (recipe.getIngredients().isEmpty()) {
+                        continue;
+                    }
+
+                    final ItemDescriptor ingredient = recipe.getIngredients().get(0);
+                    if (ingredient.matchesItem(this.user, item) && item.amount() >= ingredient.amount()) {
                         this.currentRecipes.add(craftingData);
                     }
                 }
@@ -287,6 +268,43 @@ public class StonecutterContainer extends ExperimentalContainer {
             this.selectedRecipe = 0;
         }
         //TODO: update buttons
+    }
+
+    private BedrockItem selectedResultItem() {
+        if (this.currentRecipes.isEmpty()) {
+            return BedrockItem.empty();
+        }
+        if (this.selectedRecipe >= this.currentRecipes.size()) {
+            this.selectedRecipe = 0;
+        }
+
+        final CraftingDataStorage craftingDataStorage = this.currentRecipes.get(this.selectedRecipe);
+        return switch (craftingDataStorage.type()) {
+            case SHAPELESS -> ((ShapelessRecipe) craftingDataStorage.recipe()).getResults().get(0);
+            default -> {
+                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown recipe type for stonecutter: " + craftingDataStorage.type());
+                yield BedrockItem.empty();
+            }
+        };
+    }
+
+    private int inputCost(final CraftingDataStorage craftingDataStorage) {
+        if (craftingDataStorage.recipe() instanceof ShapelessRecipe recipe && !recipe.getIngredients().isEmpty()) {
+            return Math.max(1, recipe.getIngredients().get(0).amount());
+        }
+        return 1;
+    }
+
+    private void updateOutputSlot(final int revision, final BedrockItem resultItem) {
+        this.setItem(50, resultItem);
+
+        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
+        containerSlot.write(Types.VAR_INT, (int) this.containerId());
+        containerSlot.write(Types.VAR_INT, revision);
+        containerSlot.write(Types.SHORT, (short) 1); // Output slot
+        containerSlot.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(resultItem));
+        containerSlot.send(BedrockProtocol.class);
     }
 
     private void addInventoryTransferActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
