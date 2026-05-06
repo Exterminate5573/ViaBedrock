@@ -898,13 +898,7 @@ public class ExperimentalFeatures {
 
                 if (info.result() != ItemStackNetResult.Success) {
                     ViaBedrock.getPlatform().getLogger().warning("Received unsuccessful item stack response: " + info.result());
-                    inventoryTracker.getHudContainer().setItems(requestInfo.prevCursorContainer().getItems().clone());
-                    for (ExperimentalContainer container : requestInfo.prevContainers()) {
-                        ExperimentalContainer newContainer = inventoryTracker.getContainerClientbound(container.containerId(), null, null);
-                        if (newContainer == null) continue;
-                        newContainer.setItems(container.getItems().clone());
-                        ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), newContainer);  // Resync the container content on Java side
-                    }
+                    restoreFailedInventoryRequest(wrapper.user(), inventoryTracker, requestInfo);
                     continue;
                 }
 
@@ -1331,6 +1325,31 @@ public class ExperimentalFeatures {
             return new CreativeSlot(inventoryTracker.getOffhandContainer(), inventoryTracker.getOffhandContainer().bedrockSlot(javaSlot));
         }
         return null;
+    }
+
+    private static void restoreFailedInventoryRequest(final UserConnection user, final ExperimentalInventoryTracker inventoryTracker, final InventoryRequestStorage requestInfo) {
+        inventoryTracker.getHudContainer().setItems(requestInfo.prevCursorContainer().getItems().clone());
+
+        final List<ExperimentalContainer> restoredContainers = new ArrayList<>();
+        for (ExperimentalContainer previousContainer : requestInfo.prevContainers()) {
+            final ExperimentalContainer container = inventoryTracker.getContainerClientbound(previousContainer.containerId(), null, null);
+            if (container == null) {
+                continue;
+            }
+
+            container.setItems(previousContainer.getItems().clone());
+            restoredContainers.add(container);
+        }
+
+        final List<Byte> resyncedJavaContainers = new ArrayList<>();
+        for (ExperimentalContainer container : restoredContainers) {
+            if (resyncedJavaContainers.contains(container.javaContainerId())) {
+                continue;
+            }
+
+            resyncedJavaContainers.add(container.javaContainerId());
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, container);
+        }
     }
 
     private static void applyItemStackResponse(final BedrockItem item, final ItemStackResponseSlotInfo slotInfo) {

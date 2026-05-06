@@ -210,7 +210,7 @@ public class BeaconContainer extends ExperimentalContainer {
 
     @Override
     protected boolean canQuickMoveToSlot(final int bedrockSlot, final BedrockItem item) {
-        return this.canPlaceItem(bedrockSlot, item) && item.amount() == 1;
+        return this.canPlaceItem(bedrockSlot, item);
     }
 
 }

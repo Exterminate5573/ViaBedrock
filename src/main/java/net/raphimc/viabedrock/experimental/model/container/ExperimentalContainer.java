@@ -468,7 +468,7 @@ public abstract class ExperimentalContainer {
         }
 
         final BedrockItem sourceItem = source.container().getItem(source.bedrockSlot());
-        return switch (this.type) {
+        final List<QuickMoveRange> containerRanges = switch (this.type) {
             case FURNACE, BLAST_FURNACE, SMOKER -> this.isFurnaceFuel(sourceItem)
                     ? List.of(new QuickMoveRange(this, 1, 2, false), new QuickMoveRange(this, 0, 1, false))
                     : List.of(new QuickMoveRange(this, 0, 1, false), new QuickMoveRange(this, 1, 2, false));
@@ -493,6 +493,36 @@ public abstract class ExperimentalContainer {
             case CRAFTER -> List.of(new QuickMoveRange(this, 0, 9, false));
             default -> List.of(new QuickMoveRange(this, 0, this.size(), false));
         };
+        if (this.hasQuickMoveTarget(containerRanges, sourceItem)) {
+            return containerRanges;
+        }
+        return this.playerInventoryFallbackQuickMoveRanges(javaSlot, inventory);
+    }
+
+    private boolean hasQuickMoveTarget(final List<QuickMoveRange> ranges, final BedrockItem sourceItem) {
+        for (QuickMoveRange range : ranges) {
+            final int start = range.backwards() ? range.endJavaSlot() - 1 : range.startJavaSlot();
+            final int end = range.backwards() ? range.startJavaSlot() - 1 : range.endJavaSlot();
+            final int step = range.backwards() ? -1 : 1;
+            for (int javaDestSlot = start; javaDestSlot != end; javaDestSlot += step) {
+                if (range.container().canQuickMoveToSlot(range.container().bedrockSlot(javaDestSlot), sourceItem)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private List<QuickMoveRange> playerInventoryFallbackQuickMoveRanges(final short javaSlot, final InventoryContainer inventory) {
+        final int menuInventoryStart = this.size();
+        final int menuHotbarStart = menuInventoryStart + 27;
+        if (javaSlot >= menuInventoryStart && javaSlot < menuHotbarStart) {
+            return List.of(new QuickMoveRange(inventory, 36, 45, false));
+        }
+        if (javaSlot >= menuHotbarStart && javaSlot < menuHotbarStart + 9) {
+            return List.of(new QuickMoveRange(inventory, 9, 36, false));
+        }
+        return List.of();
     }
 
     private QuickMoveRange equipmentQuickMoveRange(final SlotRef source, final ExperimentalInventoryTracker inventoryTracker) {
