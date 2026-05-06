@@ -660,8 +660,7 @@ public class ExperimentalFeatures {
             if (blockEntity != null && blockEntity.tag() != null
                     && blockEntity.tag().contains("id") && blockEntity.tag().getString("id").equals("Chest")
                     && blockEntity.tag().contains("pairlead")) {
-                //TODO: Temporary fix
-                wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaMenuId("minecraft:generic_9x6"));
+                wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaMenuId("minecraft:generic_9x6")); // type
             } else {
                 wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getBedrockToJavaContainers().get(type)); // type
             }
