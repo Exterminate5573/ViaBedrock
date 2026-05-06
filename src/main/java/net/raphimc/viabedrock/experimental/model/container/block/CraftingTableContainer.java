@@ -162,7 +162,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
         final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, revision);
-        containerSlot.write(Types.SHORT, (short) 0); // Output slot
+        containerSlot.write(Types.SHORT, (short) 0);
         containerSlot.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(resultItem));
         containerSlot.send(BedrockProtocol.class);
     }

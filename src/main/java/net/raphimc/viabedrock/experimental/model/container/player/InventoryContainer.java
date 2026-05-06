@@ -187,7 +187,7 @@ public class InventoryContainer extends ExperimentalContainer {
         containerSlot.write(Types.VAR_INT, (int) this.javaContainerId());
         containerSlot.write(Types.VAR_INT, revision);
         containerSlot.write(Types.SHORT, (short) 0);
-        containerSlot.write(VersionedTypes.V1_21_11.item, this.user.get(ItemRewriter.class).javaItem(resultItem));
+        containerSlot.write(VersionedTypes.V26_1.item, this.user.get(ItemRewriter.class).javaItem(resultItem));
         containerSlot.send(BedrockProtocol.class);
     }
 
