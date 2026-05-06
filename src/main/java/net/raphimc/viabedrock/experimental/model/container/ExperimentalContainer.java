@@ -624,81 +624,15 @@ public abstract class ExperimentalContainer {
     }
 
     protected boolean isDamageableItem(final BedrockItem item) {
-        final String identifier = this.itemIdentifier(item);
-        if (identifier == null) {
-            return false;
-        }
+        return this.user.get(ItemRewriter.class).isDamageableItem(item);
+    }
 
-        final String name = identifier.startsWith("minecraft:") ? identifier.substring("minecraft:".length()) : identifier;
-        return name.endsWith("_sword")
-                || name.endsWith("_shovel")
-                || name.endsWith("_pickaxe")
-                || name.endsWith("_axe")
-                || name.endsWith("_hoe")
-                || name.endsWith("_spear")
-                || name.endsWith("_helmet")
-                || name.endsWith("_chestplate")
-                || name.endsWith("_leggings")
-                || name.endsWith("_boots")
-                || name.equals("elytra")
-                || name.equals("shield")
-                || name.equals("bow")
-                || name.equals("crossbow")
-                || name.equals("trident")
-                || name.equals("mace")
-                || name.equals("shears")
-                || name.equals("brush")
-                || name.equals("flint_and_steel")
-                || name.equals("fishing_rod")
-                || name.equals("carrot_on_a_stick")
-                || name.equals("warped_fungus_on_a_stick")
-                || name.equals("wolf_armor");
+    protected int maxDamage(final BedrockItem item) {
+        return this.user.get(ItemRewriter.class).maxDamage(item);
     }
 
     protected boolean isFurnaceFuel(final BedrockItem item) {
-        final String identifier = this.itemIdentifier(item);
-        if (identifier == null) {
-            return false;
-        }
-
-        final String name = identifier.startsWith("minecraft:") ? identifier.substring("minecraft:".length()) : identifier;
-        return name.equals("coal")
-                || name.equals("charcoal")
-                || name.equals("coal_block")
-                || name.equals("lava_bucket")
-                || name.equals("blaze_rod")
-                || name.equals("bamboo")
-                || name.equals("dried_kelp_block")
-                || name.endsWith("_log")
-                || name.endsWith("_wood")
-                || name.endsWith("_planks")
-                || name.endsWith("_slab")
-                || name.endsWith("_stairs")
-                || name.endsWith("_fence")
-                || name.endsWith("_fence_gate")
-                || name.endsWith("_button")
-                || name.endsWith("_pressure_plate")
-                || name.endsWith("_sign")
-                || name.endsWith("_hanging_sign")
-                || name.endsWith("_door")
-                || name.endsWith("_trapdoor")
-                || name.equals("stick")
-                || name.equals("bowl")
-                || name.equals("bow")
-                || name.equals("crossbow")
-                || name.equals("crafting_table")
-                || name.equals("chest")
-                || name.equals("trapped_chest")
-                || name.equals("bookshelf")
-                || name.equals("ladder")
-                || name.equals("loom")
-                || name.equals("barrel")
-                || name.equals("cartography_table")
-                || name.equals("fletching_table")
-                || name.equals("smithing_table")
-                || name.equals("composter")
-                || name.equals("bamboo_mosaic")
-                || name.equals("dead_bush");
+        return this.user.get(ItemRewriter.class).isFurnaceFuel(item);
     }
 
     protected boolean isBrewingBottle(final BedrockItem item) {

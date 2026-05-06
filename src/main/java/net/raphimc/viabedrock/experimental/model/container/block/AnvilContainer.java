@@ -226,9 +226,8 @@ public class AnvilContainer extends ExperimentalContainer {
 
         final int inputDamage = this.damageValue(inputItem);
         final int resultDamage = this.damageValue(resultItem);
-        final String inputIdentifier = this.itemIdentifier(inputItem);
-        if (inputDamage > resultDamage && inputIdentifier != null && materialItem.identifier() != inputItem.identifier()) {
-            final int maxDamage = this.maxDamage(inputIdentifier);
+        if (inputDamage > resultDamage && materialItem.identifier() != inputItem.identifier()) {
+            final int maxDamage = this.maxDamage(inputItem);
             if (maxDamage > 0) {
                 final int repairPerItem = Math.max(1, maxDamage / 4);
                 final int repairedDamage = inputDamage - resultDamage;
@@ -268,61 +267,6 @@ public class AnvilContainer extends ExperimentalContainer {
             return damageTag.asInt();
         }
         return 0;
-    }
-
-    private int maxDamage(final String identifier) {
-        final String item = identifier.startsWith("minecraft:") ? identifier.substring("minecraft:".length()) : identifier;
-        return switch (item) {
-            case "wooden_sword", "wooden_shovel", "wooden_pickaxe", "wooden_axe", "wooden_hoe" -> 59;
-            case "wooden_spear" -> 59;
-            case "stone_sword", "stone_shovel", "stone_pickaxe", "stone_axe", "stone_hoe" -> 131;
-            case "stone_spear" -> 131;
-            case "copper_sword", "copper_shovel", "copper_pickaxe", "copper_axe", "copper_hoe", "copper_spear" -> 190;
-            case "iron_sword", "iron_shovel", "iron_pickaxe", "iron_axe", "iron_hoe", "trident" -> 250;
-            case "iron_spear" -> 250;
-            case "golden_sword", "golden_shovel", "golden_pickaxe", "golden_axe", "golden_hoe" -> 32;
-            case "golden_spear" -> 32;
-            case "diamond_sword", "diamond_shovel", "diamond_pickaxe", "diamond_axe", "diamond_hoe" -> 1561;
-            case "diamond_spear" -> 1561;
-            case "netherite_sword", "netherite_shovel", "netherite_pickaxe", "netherite_axe", "netherite_hoe" -> 2031;
-            case "netherite_spear" -> 2031;
-            case "leather_helmet" -> 55;
-            case "leather_chestplate" -> 80;
-            case "leather_leggings" -> 75;
-            case "leather_boots" -> 65;
-            case "copper_helmet" -> 121;
-            case "copper_chestplate" -> 176;
-            case "copper_leggings" -> 165;
-            case "copper_boots" -> 143;
-            case "chainmail_helmet", "iron_helmet" -> 165;
-            case "chainmail_chestplate", "iron_chestplate" -> 240;
-            case "chainmail_leggings", "iron_leggings" -> 225;
-            case "chainmail_boots", "iron_boots" -> 195;
-            case "golden_helmet" -> 77;
-            case "golden_chestplate" -> 112;
-            case "golden_leggings" -> 105;
-            case "golden_boots" -> 91;
-            case "diamond_helmet" -> 363;
-            case "diamond_chestplate" -> 528;
-            case "diamond_leggings" -> 495;
-            case "diamond_boots" -> 429;
-            case "netherite_helmet" -> 407;
-            case "netherite_chestplate" -> 592;
-            case "netherite_leggings" -> 555;
-            case "netherite_boots" -> 481;
-            case "turtle_helmet" -> 275;
-            case "elytra" -> 432;
-            case "shield" -> 336;
-            case "bow" -> 384;
-            case "crossbow" -> 465;
-            case "mace" -> 500;
-            case "shears" -> 238;
-            case "fishing_rod", "flint_and_steel", "brush" -> 64;
-            case "carrot_on_a_stick" -> 25;
-            case "warped_fungus_on_a_stick" -> 100;
-            case "wolf_armor" -> 64;
-            default -> 0;
-        };
     }
 
     private void addOutputToInventoryActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {

@@ -302,26 +302,51 @@ public class ItemRewriter extends StoredObject {
     }
 
     public int maxStackSize(final BedrockItem bedrockItem) {
-        if (bedrockItem == null || bedrockItem.isEmpty()) {
-            return 64;
-        }
-
-        final String identifier = this.items.inverse().get(bedrockItem.identifier());
-        if (identifier == null) {
-            return 64;
-        }
-
-        final ItemDefinitions.ItemDefinition itemDefinition = this.user().get(ResourcePackStorage.class).getItems().get(identifier);
+        final String identifier = this.itemIdentifier(bedrockItem);
+        final ItemDefinitions.ItemDefinition itemDefinition = this.itemDefinition(identifier);
         if (itemDefinition != null && itemDefinition.maxStackSize() != null) {
             return Math.max(1, itemDefinition.maxStackSize());
         }
 
-        final CompoundTag item = BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier);
+        final CompoundTag item = this.itemData(identifier);
         if (item != null && item.contains("maxStackSize")) {
             return item.getInt("maxStackSize", 64);
         }
 
-        return vanillaMaxStackSize(identifier);
+        return identifier != null ? vanillaMaxStackSize(identifier) : 64;
+    }
+
+    public boolean isDamageableItem(final BedrockItem bedrockItem) {
+        final CompoundTag item = this.itemData(this.itemIdentifier(bedrockItem));
+        return item != null && item.getBoolean("isDamageable", false);
+    }
+
+    public int maxDamage(final BedrockItem bedrockItem) {
+        final CompoundTag item = this.itemData(this.itemIdentifier(bedrockItem));
+        return item != null ? item.getInt("maxDamage", 0) : 0;
+    }
+
+    public boolean isFurnaceFuel(final BedrockItem bedrockItem) {
+        final CompoundTag item = this.itemData(this.itemIdentifier(bedrockItem));
+        return item != null && item.getFloat("furnaceBurnDuration", 0F) > 0F;
+    }
+
+    private String itemIdentifier(final BedrockItem bedrockItem) {
+        if (bedrockItem == null || bedrockItem.isEmpty()) {
+            return null;
+        }
+        return this.items.inverse().get(bedrockItem.identifier());
+    }
+
+    private ItemDefinitions.ItemDefinition itemDefinition(final String identifier) {
+        if (identifier == null) {
+            return null;
+        }
+        return this.user().get(ResourcePackStorage.class).getItems().get(identifier);
+    }
+
+    private CompoundTag itemData(final String identifier) {
+        return identifier != null ? BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier) : null;
     }
 
     private static int vanillaMaxStackSize(final String identifier) {
