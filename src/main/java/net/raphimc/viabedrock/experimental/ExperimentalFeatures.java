@@ -905,6 +905,7 @@ public class ExperimentalFeatures {
                 //TODO: This is required for crafting so that the cursor item net id is updated properly
                 //TODO: Check that the items match the request, if not resync the container (We probably should do this anyway to be safe)
                 List<ExperimentalContainer> mismatchedContainers = new ArrayList<>();
+                boolean unrecoverableMismatch = false;
                 for (ItemStackResponseContainerInfo containerInfo : info.containers()) {
                     for (ItemStackResponseSlotInfo slotInfo : containerInfo.slots()) {
                         final int requestSlot = Byte.toUnsignedInt(slotInfo.requestedSlot());
@@ -919,7 +920,8 @@ public class ExperimentalFeatures {
                         BedrockItem expectedItem = container.getItem(bedrockSlot);
                         if (expectedItem.isEmpty()) {
                             if (slotInfo.amount() != 0 || slotInfo.itemNetId() != 0) {
-                                mismatchedContainers.add(container);
+                                unrecoverableMismatch = true;
+                                break;
                             }
                             continue;
                         }
@@ -940,6 +942,14 @@ public class ExperimentalFeatures {
                             }
                         }
                     }
+                    if (unrecoverableMismatch) {
+                        break;
+                    }
+                }
+
+                if (unrecoverableMismatch) {
+                    restoreFailedInventoryRequest(wrapper.user(), inventoryTracker, requestInfo);
+                    continue;
                 }
 
                 for (ExperimentalContainer container : mismatchedContainers) {
