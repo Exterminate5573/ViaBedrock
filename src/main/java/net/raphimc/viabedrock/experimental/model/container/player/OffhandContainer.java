@@ -53,6 +53,16 @@ public class OffhandContainer extends InventorySubContainer {
     }
 
     @Override
+    public int stackRequestSlot(final int bedrockSlot) {
+        return 1;
+    }
+
+    @Override
+    public int bedrockSlotFromStackRequest(final int requestSlot) {
+        return 0;
+    }
+
+    @Override
     protected void onSlotChanged(final int slot, final BedrockItem oldItem, final BedrockItem newItem) {
         super.onSlotChanged(slot, oldItem, newItem);
         if (slot == 0) {

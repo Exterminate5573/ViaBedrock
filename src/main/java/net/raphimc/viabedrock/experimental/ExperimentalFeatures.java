@@ -423,9 +423,8 @@ public class ExperimentalFeatures {
                         requestId,
                         List.of(new ItemStackRequestAction.DestroyAction(
                                 existingItem.amount(),
-                                new ItemStackRequestSlotInfo(
-                                        creativeSlot.container().getFullContainerName(creativeSlot.bedrockSlot()),
-                                        (byte) creativeSlot.bedrockSlot(),
+                                creativeSlot.container().stackRequestSlotInfo(
+                                        creativeSlot.bedrockSlot(),
                                         existingItem.netId() != null ? existingItem.netId() : 0
                                 )
                         )),
@@ -468,9 +467,8 @@ public class ExperimentalFeatures {
                 if (!existingItem.isEmpty()) {
                     actions.add(new ItemStackRequestAction.DestroyAction(
                             existingItem.amount(),
-                            new ItemStackRequestSlotInfo(
-                                    creativeSlot.container().getFullContainerName(creativeSlot.bedrockSlot()),
-                                    (byte) creativeSlot.bedrockSlot(),
+                            creativeSlot.container().stackRequestSlotInfo(
+                                    creativeSlot.bedrockSlot(),
                                     existingItem.netId() != null ? existingItem.netId() : 0
                             )
                     ));
@@ -478,9 +476,8 @@ public class ExperimentalFeatures {
                 actions.add(new ItemStackRequestAction.TakeAction(
                         bedrockItem.amount(),
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                        new ItemStackRequestSlotInfo(
-                                creativeSlot.container().getFullContainerName(creativeSlot.bedrockSlot()),
-                                (byte) creativeSlot.bedrockSlot(),
+                        creativeSlot.container().stackRequestSlotInfo(
+                                creativeSlot.bedrockSlot(),
                                 existingItem.netId() != null ? existingItem.netId() : 0
                         )
                 ));
@@ -917,12 +914,13 @@ public class ExperimentalFeatures {
                 List<ExperimentalContainer> mismatchedContainers = new ArrayList<>();
                 for (ItemStackResponseContainerInfo containerInfo : info.containers()) {
                     for (ItemStackResponseSlotInfo slotInfo : containerInfo.slots()) {
-                        final int bedrockSlot = Byte.toUnsignedInt(slotInfo.requestedSlot());
-                        ExperimentalContainer container = inventoryTracker.getContainerFromName(containerInfo.containerName(), bedrockSlot);
+                        final int requestSlot = Byte.toUnsignedInt(slotInfo.requestedSlot());
+                        ExperimentalContainer container = inventoryTracker.getContainerFromName(containerInfo.containerName(), requestSlot);
                         if (container == null) {
                             ViaBedrock.getPlatform().getLogger().warning("Received item stack response for unknown container: " + containerInfo.containerName());
                             continue;
                         }
+                        final int bedrockSlot = container.bedrockSlotFromStackRequest(requestSlot);
 
                         // Check if the item matches the expected item
                         BedrockItem expectedItem = container.getItem(bedrockSlot);
