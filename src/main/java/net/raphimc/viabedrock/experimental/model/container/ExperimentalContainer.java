@@ -854,7 +854,7 @@ public abstract class ExperimentalContainer {
         }
 
         if (action == ContainerInput.PICKUP) {
-            actions.add(new ItemStackRequestAction.PlaceAction(
+            actions.add(new ItemStackRequestAction.TakeAction(
                     resultItem.amount(),
                     ItemStackRequestSlotInfo.createdOutput(requestId),
                     ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem))
@@ -862,7 +862,7 @@ public abstract class ExperimentalContainer {
         } else if (action == ContainerInput.QUICK_MOVE) {
             this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
         } else {
-            actions.add(this.placeCreatedOutputAction(resultItem, requestId, swapDestination));
+            actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
         }
 
         final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
@@ -931,11 +931,7 @@ public abstract class ExperimentalContainer {
     }
 
     protected ItemStackRequestAction placeCreatedOutputAction(final BedrockItem resultItem, final int requestId, final SwapDestination destination) {
-        return new ItemStackRequestAction.PlaceAction(
-                resultItem.amount(),
-                ItemStackRequestSlotInfo.createdOutput(requestId),
-                destination.container().stackRequestSlotInfo(destination.bedrockSlot(), 0)
-        );
+        return this.takeCreatedOutputAction(resultItem, requestId, destination);
     }
 
     protected ItemStackRequestAction takeCreatedOutputAction(final BedrockItem resultItem, final int requestId, final SwapDestination destination) {
@@ -965,7 +961,7 @@ public abstract class ExperimentalContainer {
                 final int amountToMove = mergePass
                         ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
                         : Math.min(remaining, this.maxStackSize(resultItem));
-                actions.add(new ItemStackRequestAction.PlaceAction(
+                actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
                         ItemStackRequestSlotInfo.createdOutput(requestId),
                         inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))

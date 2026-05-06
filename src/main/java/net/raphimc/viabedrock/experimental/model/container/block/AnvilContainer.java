@@ -166,7 +166,7 @@ public class AnvilContainer extends ExperimentalContainer {
             actions.add(new ItemStackRequestAction.ConsumeAction(1, this.stackRequestSlotInfo(1, inputItem.netId() != null ? inputItem.netId() : 0)));
 
             if (action == ContainerInput.PICKUP) {
-                actions.add(new ItemStackRequestAction.PlaceAction(
+                actions.add(new ItemStackRequestAction.TakeAction(
                         resultItem.amount(),
                         ItemStackRequestSlotInfo.createdOutput(requestId),
                         ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
@@ -174,7 +174,7 @@ public class AnvilContainer extends ExperimentalContainer {
             } else if (action == ContainerInput.QUICK_MOVE) {
                 this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
             } else {
-                actions.add(this.placeCreatedOutputAction(resultItem, requestId, swapDestination));
+                actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
             }
 
             final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, filterStrings, origin);
@@ -280,7 +280,7 @@ public class AnvilContainer extends ExperimentalContainer {
                 final int amountToMove = mergePass
                         ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
                         : Math.min(remaining, this.maxStackSize(resultItem));
-                actions.add(new ItemStackRequestAction.PlaceAction(
+                actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
                         ItemStackRequestSlotInfo.createdOutput(requestId),
                         inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
