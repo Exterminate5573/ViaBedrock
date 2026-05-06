@@ -270,7 +270,7 @@ public class CraftingDataTracker extends StoredObject {
                 packet.write(Types.VAR_INT, inputJavaItemId);
             }
 
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item_stack")); // Slot display type
+            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item_stack"));
             packet.write(VersionedTypes.V26_1.itemTemplate, recipe.javaOutput());
         }
 

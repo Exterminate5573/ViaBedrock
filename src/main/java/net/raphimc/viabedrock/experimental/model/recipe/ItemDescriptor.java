@@ -91,9 +91,13 @@ public interface ItemDescriptor {
             return false;
         }
 
-        packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
+        writeJavaSlotDisplayType(packet, "minecraft:item");
         packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
         return true;
+    }
+
+    static void writeJavaSlotDisplayType(final PacketWrapper packet, final String javaIdentifier) {
+        packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId(javaIdentifier));
     }
 
     default void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
@@ -127,13 +131,13 @@ public interface ItemDescriptor {
             final Integer itemId = itemRewriter.getItems().get(Key.namespaced(name));
             if (itemId == null) {
                 if (!ItemDescriptor.writeFirstMatchingJavaItemData(packet, user, item -> ItemDescriptor.itemTags(user, item).contains(name))) {
-                    packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                    ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
                 }
                 return;
             }
 
             if (!ItemDescriptor.writeJavaItemData(packet, itemRewriter, new BedrockItem(itemId))) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
             }
         }
 
@@ -164,11 +168,11 @@ public interface ItemDescriptor {
             ItemRewriter itemRewriter = user.get(ItemRewriter.class);
             Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
             if (javaItem == null) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
                 return;
             }
 
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
+            ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:item");
             packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
         }
 
@@ -205,17 +209,17 @@ public interface ItemDescriptor {
             ItemRewriter itemRewriter = user.get(ItemRewriter.class);
             Integer itemId = itemRewriter.getItems().get(Key.namespaced(fullName));
             if (itemId == null) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
                 return;
             }
 
             Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
             if (javaItem == null) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
                 return;
             }
 
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
+            ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:item");
             packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
         }
 
@@ -239,7 +243,7 @@ public interface ItemDescriptor {
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+            ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
         }
 
         @Override
@@ -267,7 +271,7 @@ public interface ItemDescriptor {
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
             if (!ItemDescriptor.writeFirstMatchingJavaItemData(packet, user, item -> ItemDescriptor.itemTags(user, item).contains(itemTag))) {
-                packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+                ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
             }
         }
 
@@ -340,7 +344,7 @@ public interface ItemDescriptor {
                 return;
             }
 
-            packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:empty")); // Slot Display Type
+            ItemDescriptor.writeJavaSlotDisplayType(packet, "minecraft:empty");
         }
 
         @Override
