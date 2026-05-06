@@ -30,6 +30,7 @@ import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotI
 import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestTracker;
+import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
@@ -617,6 +618,15 @@ public abstract class ExperimentalContainer {
     protected boolean itemNameEndsWith(final BedrockItem item, final String suffix) {
         final String identifier = this.itemIdentifier(item);
         return identifier != null && identifier.endsWith(suffix);
+    }
+
+    protected boolean hasItemTag(final BedrockItem item, final String tag) {
+        final String identifier = this.itemIdentifier(item);
+        if (identifier == null) {
+            return false;
+        }
+        final Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(identifier);
+        return tags != null && tags.contains(tag);
     }
 
     protected boolean hasEnchantmentTag(final BedrockItem item) {

@@ -31,6 +31,7 @@ import net.raphimc.viabedrock.experimental.model.container.player.InventoryConta
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
+import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
 import net.raphimc.viabedrock.experimental.model.recipe.SmithingRecipe;
 import net.raphimc.viabedrock.experimental.storage.*;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
@@ -45,6 +46,7 @@ import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 public class SmithingContainer extends ExperimentalContainer {
@@ -125,7 +127,23 @@ public class SmithingContainer extends ExperimentalContainer {
 
     @Override
     protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
-        return bedrockSlot != 50;
+        if (item.isEmpty()) {
+            return true;
+        }
+
+        return switch (bedrockSlot) {
+            case 53 -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getTemplate)
+                    || this.hasItemTag(item, "minecraft:transform_templates")
+                    || this.hasItemTag(item, "minecraft:trim_templates");
+            case 51 -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getBaseIngredient)
+                    || this.hasItemTag(item, "minecraft:transformable_items")
+                    || this.hasItemTag(item, "minecraft:trimmable_armors");
+            case 52 -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getAdditionIngredient)
+                    || this.hasItemTag(item, "minecraft:transform_materials")
+                    || this.hasItemTag(item, "minecraft:trim_materials");
+            case 50 -> false;
+            default -> false;
+        };
     }
 
     @Override
@@ -211,6 +229,17 @@ public class SmithingContainer extends ExperimentalContainer {
 
     private CraftingDataStorage recipeData() {
         return user.get(CraftingDataTracker.class).getRecipeData(this, "smithing_table");
+    }
+
+    private boolean matchesSmithingRecipeSlot(final BedrockItem item, final Function<SmithingRecipe, ItemDescriptor> descriptorGetter) {
+        for (CraftingDataStorage craftingData : this.user.get(CraftingDataTracker.class).getCraftingDataList()) {
+            if (craftingData.recipe() instanceof SmithingRecipe smithingRecipe
+                    && "smithing_table".equals(smithingRecipe.getRecipeTag())
+                    && descriptorGetter.apply(smithingRecipe).matchesItem(this.user, item)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private BedrockItem resultItem(final CraftingDataStorage craftingDataStorage) {

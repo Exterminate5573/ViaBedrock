@@ -120,7 +120,7 @@ public class LoomContainer extends ExperimentalContainer {
             return true;
         }
         return switch (bedrockSlot) {
-            case 9 -> this.itemNameEndsWith(item, "_banner") || this.isItem(item, "minecraft:banner");
+            case 9 -> this.hasItemTag(item, "minecraft:banner") || this.itemNameEndsWith(item, "_banner");
             case 10 -> this.itemNameEndsWith(item, "_dye");
             case 11 -> this.itemNameEndsWith(item, "_banner_pattern");
             case 50 -> false;
