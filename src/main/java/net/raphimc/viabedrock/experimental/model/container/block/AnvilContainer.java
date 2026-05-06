@@ -199,7 +199,7 @@ public class AnvilContainer extends ExperimentalContainer {
                     inventoryTracker.getHudContainer().setItem(0, newCursorItem);
                 }
             } else if (action == ContainerInput.QUICK_MOVE) {
-                this.addToInventory(inventory, resultItem, resultItem.amount(), true);
+                this.addToInventory(inventory, resultItem, resultItem.amount(), true, requestId);
                 ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventory);
             } else {
                 swapDestination.container().setItem(swapDestination.bedrockSlot(), resultItem.copy());

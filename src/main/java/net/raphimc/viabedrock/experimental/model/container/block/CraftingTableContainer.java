@@ -235,7 +235,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers));
         ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
 
-        this.addToInventory(inventoryTracker.getInventoryContainer(), resultItem, crafts * resultItem.amount(), true);
+        this.addToInventory(inventoryTracker.getInventoryContainer(), resultItem, crafts * resultItem.amount(), true, requestId);
         this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, crafts);
         this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
         ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());

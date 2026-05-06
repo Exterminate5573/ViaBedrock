@@ -241,7 +241,7 @@ public class InventoryContainer extends ExperimentalContainer {
         this.addInventoryTransferActions(actions, resultItem, crafts * resultItem.amount(), requestId);
 
         this.sendCraftRequest(revision, inventoryTracker, inventoryRequestTracker, requestId, actions);
-        this.addToInventory(this, resultItem, crafts * resultItem.amount(), true);
+        this.addToInventory(this, resultItem, crafts * resultItem.amount(), true, requestId);
         this.consumeIngredients(inventoryTracker, recipeMatch.ingredients(), crafts);
         this.updateCraftingOutputSlot(revision, inventoryTracker, this.resultItem(this.recipeMatch(inventoryTracker)));
         ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, this);

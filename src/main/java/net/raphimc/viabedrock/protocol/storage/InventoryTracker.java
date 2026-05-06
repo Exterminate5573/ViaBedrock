@@ -100,14 +100,14 @@ public class InventoryTracker extends StoredObject {
     }
 
     public void markPendingClose(final Container container) {
-        if (this.pendingCloseContainer != null) {
-            return;
-        }
         if (container == null) {
             return;
         }
         if (this.currentContainer == container) {
             this.currentContainer = null;
+        }
+        if (this.pendingCloseContainer != null) {
+            return;
         }
         this.pendingCloseContainer = container;
     }
