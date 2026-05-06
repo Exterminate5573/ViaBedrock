@@ -190,7 +190,7 @@ public class ExperimentalInventoryTracker extends StoredObject {
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(cursorItem)),
-                        new ItemStackRequestSlotInfo(this.inventoryContainer.getFullContainerName(slot), (byte) slot, this.stackNetId(destinationItem))
+                        this.inventoryContainer.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
                 ));
 
                 if (destinationItem.isEmpty()) {

@@ -29,7 +29,6 @@ import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestTracker;
@@ -168,11 +167,7 @@ public class BeaconContainer extends ExperimentalContainer {
                         ),
                         new ItemStackRequestAction.DestroyAction(
                                 1,
-                                new ItemStackRequestSlotInfo(
-                                        this.getFullContainerName(27),
-                                        (byte) 27,
-                                        this.stackNetId(paymentItem)
-                                )
+                                this.stackRequestSlotInfo(27, this.stackNetId(paymentItem))
                         )
                 ),
                 List.of(),

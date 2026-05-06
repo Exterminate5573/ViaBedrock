@@ -184,11 +184,7 @@ public class StonecutterContainer extends ExperimentalContainer {
         actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), craftableAmount));
         actions.add(new ItemStackRequestAction.ConsumeAction(
                 toConsume,
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(3),
-                        (byte) 3,
-                        sourceItem.netId() != null ? sourceItem.netId() : 0
-                )
+                this.stackRequestSlotInfo(3, sourceItem.netId() != null ? sourceItem.netId() : 0)
         ));
         if (action == ContainerInput.PICKUP) {
             actions.add(new ItemStackRequestAction.TakeAction(
@@ -346,7 +342,7 @@ public class StonecutterContainer extends ExperimentalContainer {
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                        inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;
             }

@@ -141,16 +141,12 @@ public class EnchantmentContainer extends ExperimentalContainer {
 
         ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(enchantData.netId(), 1);
         ItemStackRequestAction craftResultsAction = new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1);
-        ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                this.getFullContainerName(14), (byte) 14, this.stackNetId(inputItem)
-        ));
+        ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, this.stackRequestSlotInfo(14, this.stackNetId(inputItem)));
         ItemStackRequestAction placeAction = new ItemStackRequestAction.PlaceAction(1,
                 new ItemStackRequestSlotInfo(
                         new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, reqId
                 ),
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(14), (byte) 14, reqId
-                )
+                this.stackRequestSlotInfo(14, reqId)
         );
         actions.add(craftAction);
         actions.add(craftResultsAction);
@@ -158,9 +154,7 @@ public class EnchantmentContainer extends ExperimentalContainer {
         actions.add(placeAction);
 
         if (survivalLike) {
-            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(materialCost, new ItemStackRequestSlotInfo(
-                    this.getFullContainerName(15), (byte) 15, this.stackNetId(materialItem)
-            ));
+            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(materialCost, this.stackRequestSlotInfo(15, this.stackNetId(materialItem)));
             actions.add(consumeAction2);
         }
 

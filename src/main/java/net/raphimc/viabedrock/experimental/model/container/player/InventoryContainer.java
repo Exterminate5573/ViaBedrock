@@ -304,7 +304,7 @@ public class InventoryContainer extends ExperimentalContainer {
             if (!item.isEmpty()) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(
                         ingredient.count() * crafts,
-                        new ItemStackRequestSlotInfo(inventoryTracker.getHudContainer().getFullContainerName(inputSlot), (byte) inputSlot, item.netId() != null ? item.netId() : 0)
+                        inventoryTracker.getHudContainer().stackRequestSlotInfo(inputSlot, item.netId() != null ? item.netId() : 0)
                 ));
             }
         }
@@ -339,7 +339,7 @@ public class InventoryContainer extends ExperimentalContainer {
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                        new ItemStackRequestSlotInfo(this.getFullContainerName(slot), (byte) slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                        this.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;
             }

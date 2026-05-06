@@ -249,7 +249,7 @@ public class SmithingContainer extends ExperimentalContainer {
             if (!item.isEmpty()) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(
                         1,
-                        new ItemStackRequestSlotInfo(this.getFullContainerName(slot), (byte) slot, item.netId() != null ? item.netId() : 0)
+                        this.stackRequestSlotInfo(slot, item.netId() != null ? item.netId() : 0)
                 ));
             }
         }
@@ -284,7 +284,7 @@ public class SmithingContainer extends ExperimentalContainer {
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                        inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;
             }

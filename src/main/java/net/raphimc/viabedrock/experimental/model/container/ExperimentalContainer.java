@@ -696,7 +696,7 @@ public abstract class ExperimentalContainer {
 
         return new ItemStackRequestAction.DropAction(
                 amountToDrop,
-                new ItemStackRequestSlotInfo(inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, this.stackNetId(cursorItem)),
+                inventoryTracker.getHudContainer().stackRequestSlotInfo(0, this.stackNetId(cursorItem)),
                 false
         );
     }
@@ -838,7 +838,7 @@ public abstract class ExperimentalContainer {
             if (ingredient.requestAction() && !item.isEmpty() && count > 0) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(
                         count,
-                        new ItemStackRequestSlotInfo(this.getFullContainerName(ingredient.bedrockSlot()), (byte) ingredient.bedrockSlot(), this.stackNetId(item))
+                        this.stackRequestSlotInfo(ingredient.bedrockSlot(), this.stackNetId(item))
                 ));
             }
         }
@@ -958,7 +958,7 @@ public abstract class ExperimentalContainer {
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, this.stackNetId(destinationItem))
+                        inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
                 ));
                 remaining -= amountToMove;
             }
@@ -991,7 +991,7 @@ public abstract class ExperimentalContainer {
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(item)),
-                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, this.stackNetId(destinationItem))
+                        inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
                 ));
 
                 if (destinationItem.isEmpty()) {

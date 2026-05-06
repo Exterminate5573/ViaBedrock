@@ -161,17 +161,9 @@ public class AnvilContainer extends ExperimentalContainer {
             final List<ItemStackRequestAction> actions = new ArrayList<>();
             actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, filterStrings.isEmpty() ? -1 : 0));
             if (materialConsumeCount > 0) {
-                actions.add(new ItemStackRequestAction.ConsumeAction(materialConsumeCount, new ItemStackRequestSlotInfo(
-                        new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
-                        (byte) 2,
-                        materialItem.netId() != null ? materialItem.netId() : 0
-                )));
+                actions.add(new ItemStackRequestAction.ConsumeAction(materialConsumeCount, this.stackRequestSlotInfo(2, materialItem.netId() != null ? materialItem.netId() : 0)));
             }
-            actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                    new FullContainerName(ContainerEnumName.AnvilInputContainer, null),
-                    (byte) 1,
-                    inputItem.netId() != null ? inputItem.netId() : 0
-            )));
+            actions.add(new ItemStackRequestAction.ConsumeAction(1, this.stackRequestSlotInfo(1, inputItem.netId() != null ? inputItem.netId() : 0)));
 
             if (action == ContainerInput.PICKUP) {
                 actions.add(new ItemStackRequestAction.PlaceAction(
@@ -291,7 +283,7 @@ public class AnvilContainer extends ExperimentalContainer {
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
                         new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                        new ItemStackRequestSlotInfo(inventory.getFullContainerName(slot), (byte) slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                        inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;
             }
