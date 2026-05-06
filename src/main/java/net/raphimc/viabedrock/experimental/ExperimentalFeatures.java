@@ -1407,7 +1407,8 @@ public class ExperimentalFeatures {
             case SMOKER -> "container.smoker";
             case STONECUTTER -> "container.stonecutter";
             case WORKBENCH -> "container.crafting";
-            default -> "container.chest";
+            case ARMOR, CAULDRON, COMMAND_BLOCK, COMPOUND_CREATOR, DECORATED_POT, ELEMENT_CONSTRUCTOR, HAND, HORSE, HUD, INVENTORY, JIGSAW_EDITOR,
+                 JUKEBOX, LAB_TABLE, LECTERN, MATERIAL_REDUCER, NONE, STRUCTURE_EDITOR, TRADE -> "container.chest";
         };
     }
 
