@@ -101,7 +101,10 @@ public class InventoryTracker extends StoredObject {
 
     public void markPendingClose(final Container container) {
         if (this.pendingCloseContainer != null) {
-            throw new IllegalStateException("There is already another container pending close");
+            return;
+        }
+        if (container == null) {
+            return;
         }
         if (this.currentContainer == container) {
             this.currentContainer = null;
