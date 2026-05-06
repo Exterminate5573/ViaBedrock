@@ -200,7 +200,7 @@ public abstract class ExperimentalContainer {
         return new ItemStackRequestAction.TakeAction(
                 amountToTake,
                 container.stackRequestSlotInfo(bedrockSlot, this.stackNetId(item)),
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, 0)
+                ItemStackRequestSlotInfo.cursor(0)
         );
     }
 
@@ -232,7 +232,7 @@ public abstract class ExperimentalContainer {
 
         return new ItemStackRequestAction.PlaceAction(
                 amountToPlace,
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, cursorNetId),
+                ItemStackRequestSlotInfo.cursor(cursorNetId),
                 container.stackRequestSlotInfo(bedrockSlot, containerNetId)
         );
     }
@@ -249,7 +249,7 @@ public abstract class ExperimentalContainer {
         clickContext.inventoryTracker.getHudContainer().setItem(0, itemCopy);
 
         return new ItemStackRequestAction.SwapAction(
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, this.stackNetId(cursorItem)),
+                ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem)),
                 container.stackRequestSlotInfo(bedrockSlot, this.stackNetId(item))
         );
     }
@@ -343,7 +343,7 @@ public abstract class ExperimentalContainer {
         actions.add(new ItemStackRequestAction.TakeAction(
                 item.amount(),
                 container.stackRequestSlotInfo(clickContext.bedrockSlot, this.stackNetId(item)),
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, 0)
+                ItemStackRequestSlotInfo.cursor(0)
         ));
 
         actions.add(new ItemStackRequestAction.PlaceAction(
@@ -360,7 +360,7 @@ public abstract class ExperimentalContainer {
         if (movedToInventory < item.amount()) {
             actions.add(new ItemStackRequestAction.DropAction(
                     item.amount() - movedToInventory,
-                    new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, this.stackNetId(item)),
+                    ItemStackRequestSlotInfo.cursor(this.stackNetId(item)),
                     false
             ));
         }
@@ -706,7 +706,7 @@ public abstract class ExperimentalContainer {
 
         return new ItemStackRequestAction.DropAction(
                 amountToDrop,
-                inventoryTracker.getHudContainer().stackRequestSlotInfo(0, this.stackNetId(cursorItem)),
+                ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem)),
                 false
         );
     }
@@ -856,8 +856,8 @@ public abstract class ExperimentalContainer {
         if (action == ContainerInput.PICKUP) {
             actions.add(new ItemStackRequestAction.PlaceAction(
                     resultItem.amount(),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(cursorItem))
+                    ItemStackRequestSlotInfo.createdOutput(requestId),
+                    ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem))
             ));
         } else if (action == ContainerInput.QUICK_MOVE) {
             this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
@@ -933,7 +933,7 @@ public abstract class ExperimentalContainer {
     protected ItemStackRequestAction placeCreatedOutputAction(final BedrockItem resultItem, final int requestId, final SwapDestination destination) {
         return new ItemStackRequestAction.PlaceAction(
                 resultItem.amount(),
-                new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                ItemStackRequestSlotInfo.createdOutput(requestId),
                 destination.container().stackRequestSlotInfo(destination.bedrockSlot(), 0)
         );
     }
@@ -941,7 +941,7 @@ public abstract class ExperimentalContainer {
     protected ItemStackRequestAction takeCreatedOutputAction(final BedrockItem resultItem, final int requestId, final SwapDestination destination) {
         return new ItemStackRequestAction.TakeAction(
                 resultItem.amount(),
-                new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                ItemStackRequestSlotInfo.createdOutput(requestId),
                 destination.container().stackRequestSlotInfo(destination.bedrockSlot(), 0)
         );
     }
@@ -967,7 +967,7 @@ public abstract class ExperimentalContainer {
                         : Math.min(remaining, this.maxStackSize(resultItem));
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
                 ));
                 remaining -= amountToMove;
@@ -1000,7 +1000,7 @@ public abstract class ExperimentalContainer {
 
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(item)),
+                        ItemStackRequestSlotInfo.cursor(this.stackNetId(item)),
                         inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
                 ));
 

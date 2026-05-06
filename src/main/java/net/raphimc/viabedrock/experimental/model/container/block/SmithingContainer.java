@@ -56,6 +56,8 @@ public class SmithingContainer extends ExperimentalContainer {
     public static final int MATERIAL_SLOT = 52;
     public static final int TEMPLATE_SLOT = 53;
 
+    private static final int[] INGREDIENT_SLOTS = {TEMPLATE_SLOT, INPUT_SLOT, MATERIAL_SLOT};
+
     public SmithingContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
         super(user, containerId, ContainerType.SMITHING_TABLE, title, position, 4, CustomBlockTags.SMITHING_TABLE);
     }
@@ -66,7 +68,7 @@ public class SmithingContainer extends ExperimentalContainer {
             case TEMPLATE_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableTemplateContainer, null);
             case INPUT_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableInputContainer, null);
             case MATERIAL_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableMaterialContainer, null);
-            case RESULT_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableResultPreviewContainer, null); //TODO: CreatedOutputContainer?
+            case RESULT_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableResultPreviewContainer, null);
             default -> throw new IllegalArgumentException("Invalid slot for Smithing Container: " + slot);
         };
     }
@@ -132,16 +134,16 @@ public class SmithingContainer extends ExperimentalContainer {
         }
 
         return switch (bedrockSlot) {
-            case 53 -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getTemplate)
+            case TEMPLATE_SLOT -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getTemplate)
                     || this.hasItemTag(item, "minecraft:transform_templates")
                     || this.hasItemTag(item, "minecraft:trim_templates");
-            case 51 -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getBaseIngredient)
+            case INPUT_SLOT -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getBaseIngredient)
                     || this.hasItemTag(item, "minecraft:transformable_items")
                     || this.hasItemTag(item, "minecraft:trimmable_armors");
-            case 52 -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getAdditionIngredient)
+            case MATERIAL_SLOT -> this.matchesSmithingRecipeSlot(item, SmithingRecipe::getAdditionIngredient)
                     || this.hasItemTag(item, "minecraft:transform_materials")
                     || this.hasItemTag(item, "minecraft:trim_materials");
-            case 50 -> false;
+            case RESULT_SLOT -> false;
             default -> false;
         };
     }
@@ -187,8 +189,8 @@ public class SmithingContainer extends ExperimentalContainer {
         if (action == ContainerInput.PICKUP) {
             actions.add(new ItemStackRequestAction.TakeAction(
                     resultItem.amount(),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
+                    ItemStackRequestSlotInfo.createdOutput(requestId),
+                    ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
             ));
         } else if (action == ContainerInput.QUICK_MOVE) {
             this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
@@ -247,7 +249,7 @@ public class SmithingContainer extends ExperimentalContainer {
             return BedrockItem.empty();
         }
 
-        final BedrockItem outputItem = this.getItem(50);
+        final BedrockItem outputItem = this.getItem(RESULT_SLOT);
         if (!outputItem.isEmpty()) {
             return outputItem;
         }
@@ -260,7 +262,7 @@ public class SmithingContainer extends ExperimentalContainer {
     }
 
     private void updateOutputSlot(final int revision, final BedrockItem resultItem) {
-        this.setItem(50, resultItem);
+        this.setItem(RESULT_SLOT, resultItem);
         final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, revision);
@@ -273,7 +275,7 @@ public class SmithingContainer extends ExperimentalContainer {
         final List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), 1));
         actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1));
-        for (int slot : new int[]{TEMPLATE_SLOT, INPUT_SLOT, MATERIAL_SLOT}) {
+        for (int slot : INGREDIENT_SLOTS) {
             final BedrockItem item = this.getItem(slot);
             if (!item.isEmpty()) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(
@@ -312,7 +314,7 @@ public class SmithingContainer extends ExperimentalContainer {
                         : Math.min(remaining, this.maxStackSize(resultItem));
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;

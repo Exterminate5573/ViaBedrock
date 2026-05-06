@@ -475,7 +475,7 @@ public class ExperimentalFeatures {
                 }
                 actions.add(new ItemStackRequestAction.TakeAction(
                         bedrockItem.amount(),
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         creativeSlot.container().stackRequestSlotInfo(
                                 creativeSlot.bedrockSlot(),
                                 existingItem.netId() != null ? existingItem.netId() : 0
@@ -485,7 +485,7 @@ public class ExperimentalFeatures {
             } else if (slot == -1) {
                 actions.add(new ItemStackRequestAction.DropAction(
                         bedrockItem.amount(),
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         false
                 ));
             } else {

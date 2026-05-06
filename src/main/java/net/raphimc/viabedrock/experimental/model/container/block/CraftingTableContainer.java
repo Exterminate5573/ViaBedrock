@@ -182,8 +182,8 @@ public class CraftingTableContainer extends ExperimentalContainer {
         }
         actions.add(new ItemStackRequestAction.TakeAction(
                 resultItem.amount(),
-                new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
+                ItemStackRequestSlotInfo.createdOutput(requestId),
+                ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
         ));
 
         final List<ExperimentalContainer> prevContainers = new ArrayList<>();
@@ -328,7 +328,7 @@ public class CraftingTableContainer extends ExperimentalContainer {
                         : Math.min(remaining, this.maxStackSize(resultItem));
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;

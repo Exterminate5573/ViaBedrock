@@ -62,7 +62,7 @@ public class StonecutterContainer extends ExperimentalContainer {
     public FullContainerName getFullContainerName(int slot) {
         return switch (slot) {
             case 3 -> new FullContainerName(ContainerEnumName.StonecutterInputContainer, null);
-            case 50 -> new FullContainerName(ContainerEnumName.CreatedOutputContainer, null); //TODO: CreatedOutputContainer?
+            case 50 -> new FullContainerName(ContainerEnumName.CreatedOutputContainer, null);
             default -> throw new IllegalArgumentException("Invalid slot for Stonecutter Container: " + slot);
         };
     }
@@ -189,8 +189,8 @@ public class StonecutterContainer extends ExperimentalContainer {
         if (action == ContainerInput.PICKUP) {
             actions.add(new ItemStackRequestAction.TakeAction(
                     resultItem.amount(),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, nextRequestId),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
+                    ItemStackRequestSlotInfo.createdOutput(nextRequestId),
+                    ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
             ));
         } else if (action == ContainerInput.QUICK_MOVE) {
             this.addInventoryTransferActions(actions, inventory, resultItem, craftableAmount * resultItem.amount(), nextRequestId);
@@ -341,7 +341,7 @@ public class StonecutterContainer extends ExperimentalContainer {
                         : Math.min(remaining, this.maxStackSize(resultItem));
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;

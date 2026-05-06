@@ -205,8 +205,8 @@ public class InventoryContainer extends ExperimentalContainer {
         }
         actions.add(new ItemStackRequestAction.TakeAction(
                 resultItem.amount(),
-                new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
-                new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, cursorItem.netId() != null ? cursorItem.netId() : 0)
+                ItemStackRequestSlotInfo.createdOutput(requestId),
+                ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
         ));
 
         this.sendCraftRequest(revision, inventoryTracker, inventoryRequestTracker, requestId, actions);
@@ -338,7 +338,7 @@ public class InventoryContainer extends ExperimentalContainer {
                         : Math.min(remaining, this.maxStackSize(resultItem));
                 actions.add(new ItemStackRequestAction.TakeAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
                         this.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
                 ));
                 remaining -= amountToMove;

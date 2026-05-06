@@ -27,6 +27,7 @@ import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPack
 import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.container.block.SmithingContainer;
 import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapedRecipe;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapelessRecipe;
@@ -92,15 +93,14 @@ public class CraftingDataTracker extends StoredObject {
                     }
                 }
                 case SMITHING_TRIM, SMITHING_TRANSFORM -> {
-                    // TODO: Hard coded slots for Smithing Container
                     SmithingRecipe smithingRecipe = (SmithingRecipe) craftingData.recipe();
-                    if (matchesIngredient(container.getItem(53), smithingRecipe.getTemplate(), 0) &&
-                            matchesIngredient(container.getItem(51), smithingRecipe.getBaseIngredient(), 0) &&
-                            matchesIngredient(container.getItem(52), smithingRecipe.getAdditionIngredient(), 0)) {
+                    if (matchesIngredient(container.getItem(SmithingContainer.TEMPLATE_SLOT), smithingRecipe.getTemplate(), 0) &&
+                            matchesIngredient(container.getItem(SmithingContainer.INPUT_SLOT), smithingRecipe.getBaseIngredient(), 0) &&
+                            matchesIngredient(container.getItem(SmithingContainer.MATERIAL_SLOT), smithingRecipe.getAdditionIngredient(), 0)) {
                         return new RecipeMatch(craftingData, List.of(
-                                new IngredientUse(53, smithingRecipe.getTemplate().amount()),
-                                new IngredientUse(51, smithingRecipe.getBaseIngredient().amount()),
-                                new IngredientUse(52, smithingRecipe.getAdditionIngredient().amount())
+                                new IngredientUse(SmithingContainer.TEMPLATE_SLOT, smithingRecipe.getTemplate().amount()),
+                                new IngredientUse(SmithingContainer.INPUT_SLOT, smithingRecipe.getBaseIngredient().amount()),
+                                new IngredientUse(SmithingContainer.MATERIAL_SLOT, smithingRecipe.getAdditionIngredient().amount())
                         ));
                     }
                 }

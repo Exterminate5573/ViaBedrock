@@ -143,9 +143,7 @@ public class EnchantmentContainer extends ExperimentalContainer {
         ItemStackRequestAction craftResultsAction = new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1);
         ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, this.stackRequestSlotInfo(14, this.stackNetId(inputItem)));
         ItemStackRequestAction placeAction = new ItemStackRequestAction.PlaceAction(1,
-                new ItemStackRequestSlotInfo(
-                        new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, reqId
-                ),
+                ItemStackRequestSlotInfo.createdOutput(reqId),
                 this.stackRequestSlotInfo(14, reqId)
         );
         actions.add(craftAction);

@@ -189,7 +189,7 @@ public class ExperimentalInventoryTracker extends StoredObject {
 
                 actions.add(new ItemStackRequestAction.PlaceAction(
                         amountToMove,
-                        new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(cursorItem)),
+                        ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem)),
                         this.inventoryContainer.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
                 ));
 
@@ -209,7 +209,7 @@ public class ExperimentalInventoryTracker extends StoredObject {
         if (!remaining.isEmpty()) {
             actions.add(new ItemStackRequestAction.DropAction(
                     remaining.amount(),
-                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CursorContainer, null), (byte) 0, this.stackNetId(cursorItem)),
+                    ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem)),
                     false
             ));
         }
