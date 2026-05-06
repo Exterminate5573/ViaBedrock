@@ -139,7 +139,7 @@ public class ExperimentalInventoryTracker extends StoredObject {
         if (container == null) {
             return;
         }
-        if (this.currentContainer == container) {
+        if (this.currentContainer != null && this.currentContainer.javaContainerId() == container.javaContainerId()) {
             this.currentContainer = null;
         }
         if (this.pendingCloseContainer != null) {
@@ -293,9 +293,10 @@ public class ExperimentalInventoryTracker extends StoredObject {
     }
 
     public void setCurrentContainer(final ExperimentalContainer container) {
-        if (this.isContainerOpen()) {
+        if (this.currentContainer != null) {
             throw new IllegalStateException("There is already another container open");
         }
+        this.pendingCloseContainer = null;
         this.currentContainer = container;
     }
 
@@ -303,10 +304,24 @@ public class ExperimentalInventoryTracker extends StoredObject {
         return this.pendingCloseContainer;
     }
 
+    public void prepareForServerContainerOpen() {
+        if (this.currentContainer != null) {
+            PacketFactory.sendJavaContainerClose(this.user(), this.currentContainer.javaContainerId());
+        }
+        this.returnCursorItem();
+        this.currentContainer = null;
+        this.pendingCloseContainer = null;
+    }
+
     private void forceCloseCurrentContainer() {
-        this.markPendingClose(this.currentContainer);
-        PacketFactory.sendJavaContainerClose(this.user(), this.pendingCloseContainer.javaContainerId());
-        PacketFactory.sendBedrockContainerClose(this.user(), this.pendingCloseContainer.containerId(), ContainerType.NONE);
+        final ExperimentalContainer closingContainer = this.currentContainer;
+        if (closingContainer == null) {
+            return;
+        }
+        this.currentContainer = null;
+        this.pendingCloseContainer = closingContainer;
+        PacketFactory.sendJavaContainerClose(this.user(), closingContainer.javaContainerId());
+        PacketFactory.sendBedrockContainerClose(this.user(), closingContainer.containerId(), ContainerType.NONE);
     }
 
 }

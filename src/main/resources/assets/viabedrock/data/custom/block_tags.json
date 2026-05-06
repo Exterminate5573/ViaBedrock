@@ -42,6 +42,9 @@
     "minecraft:campfire",
     "minecraft:soul_campfire"
   ],
+  "cartography_table": [
+    "minecraft:cartography_table"
+  ],
   "cauldron": [
     "minecraft:cauldron"
   ],
@@ -154,6 +157,9 @@
   ],
   "lodestone": [
     "minecraft:lodestone"
+  ],
+  "loom": [
+    "minecraft:loom"
   ],
   "mob_spawner": [
     "minecraft:mob_spawner"

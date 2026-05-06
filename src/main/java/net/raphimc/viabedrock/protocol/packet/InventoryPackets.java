@@ -102,8 +102,12 @@ public class InventoryPackets {
             final BlockPosition position = wrapper.read(BedrockTypes.BLOCK_POSITION); // position
             wrapper.read(BedrockTypes.VAR_LONG); // entity unique id
 
-            if (inventoryTracker.isAnyScreenOpen()) {
+            if (inventoryTracker.isContainerOpen()) {
                 ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another container is open");
+                inventoryTracker.prepareForServerContainerOpen();
+            }
+            if (inventoryTracker.getCurrentForm() != null) {
+                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another screen is open");
                 PacketFactory.sendBedrockContainerClose(wrapper.user(), (byte) -1, ContainerType.NONE);
                 wrapper.cancel();
                 return;

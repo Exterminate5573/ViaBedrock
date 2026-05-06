@@ -25,6 +25,7 @@ import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestActio
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
+import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
@@ -33,7 +34,7 @@ import java.util.List;
 public class CartographyContainer extends ExperimentalContainer {
 
     public CartographyContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
-        super(user, containerId, ContainerType.CARTOGRAPHY, title, position, 3, "cartography_table");
+        super(user, containerId, ContainerType.CARTOGRAPHY, title, position, 3, CustomBlockTags.CARTOGRAPHY_TABLE);
     }
 
     @Override

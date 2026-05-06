@@ -55,7 +55,7 @@ public class StonecutterContainer extends ExperimentalContainer {
     private BedrockItem lastRecipeInput = BedrockItem.empty();
 
     public StonecutterContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
-        super(user, containerId, ContainerType.STONECUTTER, title, position, 2, "stonecutter_block", "stonecutter");
+        super(user, containerId, ContainerType.STONECUTTER, title, position, 2, CustomBlockTags.STONECUTTER);
     }
 
     @Override
