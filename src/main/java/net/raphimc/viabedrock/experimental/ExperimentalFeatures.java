@@ -1400,13 +1400,14 @@ public class ExperimentalFeatures {
             case ENCHANTMENT -> "container.enchant";
             case FURNACE -> "container.furnace";
             case GRINDSTONE -> "container.grindstone_title";
-            case HOPPER -> "container.hopper";
+            case HOPPER, MINECART_HOPPER -> "container.hopper";
             case LOOM -> "container.loom";
+            case MINECART_CHEST, CHEST_BOAT -> "container.chest";
             case SMITHING_TABLE -> "container.upgrade";
             case SMOKER -> "container.smoker";
             case STONECUTTER -> "container.stonecutter";
             case WORKBENCH -> "container.crafting";
-            default -> "container." + blockTag;
+            default -> "container.chest";
         };
     }
 

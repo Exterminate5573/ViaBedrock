@@ -21,6 +21,7 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
+import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
@@ -94,6 +95,25 @@ public interface ItemDescriptor {
         writeJavaSlotDisplayType(packet, "minecraft:item");
         packet.write(Types.VAR_INT, javaItem.identifier()); // Item ID
         return true;
+    }
+
+    static void writeJavaItemStackData(final PacketWrapper packet, final UserConnection user, final BedrockItem bedrockItem) {
+        final Item javaItem = user.get(ItemRewriter.class).javaItem(bedrockItem);
+        if (javaItem == null || javaItem.isEmpty()) {
+            writeJavaSlotDisplayType(packet, "minecraft:empty");
+            return;
+        }
+
+        writeJavaSlotDisplayType(packet, "minecraft:item_stack");
+        packet.write(VersionedTypes.V26_1.itemTemplate, javaItem);
+    }
+
+    static void writeJavaItemNameData(final PacketWrapper packet, final UserConnection user, final String javaIdentifier) {
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final Integer itemId = itemRewriter.getItems().get(Key.namespaced(javaIdentifier));
+        if (itemId == null || !writeJavaItemData(packet, itemRewriter, new BedrockItem(itemId))) {
+            writeJavaSlotDisplayType(packet, "minecraft:empty");
+        }
     }
 
     static void writeJavaSlotDisplayType(final PacketWrapper packet, final String javaIdentifier) {

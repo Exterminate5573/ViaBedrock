@@ -569,6 +569,11 @@ public class InventoryPackets {
 
     private static String javaContainerTitleKey(final ContainerType type, final String blockTag) {
         return switch (type) {
+            case ANVIL -> "container.repair";
+            case BEACON -> "container.beacon";
+            case BLAST_FURNACE -> "container.blast_furnace";
+            case BREWING_STAND -> "container.brewing";
+            case CARTOGRAPHY -> "container.cartography_table";
             case CONTAINER -> {
                 if ("barrel".equals(blockTag)) {
                     yield "container.barrel";
@@ -581,7 +586,20 @@ public class InventoryPackets {
                 }
                 yield "container.chest";
             }
-            default -> "container." + blockTag;
+            case CRAFTER -> "container.crafter";
+            case DISPENSER -> "container.dispenser";
+            case DROPPER -> "container.dropper";
+            case ENCHANTMENT -> "container.enchant";
+            case FURNACE -> "container.furnace";
+            case GRINDSTONE -> "container.grindstone_title";
+            case HOPPER, MINECART_HOPPER -> "container.hopper";
+            case LOOM -> "container.loom";
+            case MINECART_CHEST, CHEST_BOAT -> "container.chest";
+            case SMITHING_TABLE -> "container.upgrade";
+            case SMOKER -> "container.smoker";
+            case STONECUTTER -> "container.stonecutter";
+            case WORKBENCH -> "container.crafting";
+            default -> "container.chest";
         };
     }
 
