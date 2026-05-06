@@ -38,10 +38,6 @@ public class InventoryRequestTracker extends StoredObject {
         this.requests.put(info.requestInfo().requestId(), info);
     }
 
-    public boolean hasPendingRequests() {
-        return !this.requests.isEmpty();
-    }
-
     public InventoryRequestStorage getRequest(int requestId) {
         return this.requests.get(requestId);
     }

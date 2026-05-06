@@ -349,11 +349,6 @@ public class ExperimentalFeatures {
                 wrapper.cancel();
                 return;
             }
-            final InventoryRequestTracker inventoryRequestTracker = wrapper.user().get(InventoryRequestTracker.class);
-            if (inventoryRequestTracker.hasPendingRequests()) {
-                resyncInventoryView(wrapper.user(), inventoryTracker, (byte) containerId);
-                return;
-            }
             final ExperimentalContainer container = inventoryTracker.getContainerServerbound((byte) containerId);
             if (container == null) {
                 if (containerId == ContainerID.CONTAINER_ID_INVENTORY.getValue()) {
@@ -386,11 +381,6 @@ public class ExperimentalFeatures {
                 wrapper.cancel();
                 return;
             }
-            final InventoryRequestTracker inventoryRequestTracker = wrapper.user().get(InventoryRequestTracker.class);
-            if (inventoryRequestTracker.hasPendingRequests()) {
-                resyncInventoryView(wrapper.user(), inventoryTracker, (byte) containerId);
-                return;
-            }
             final ExperimentalContainer container = inventoryTracker.getContainerServerbound((byte) containerId);
             if (container == null) {
                 wrapper.cancel();
@@ -414,10 +404,6 @@ public class ExperimentalFeatures {
                 return;
             }
             final InventoryRequestTracker inventoryRequestTracker = wrapper.user().get(InventoryRequestTracker.class);
-            if (inventoryRequestTracker.hasPendingRequests()) {
-                resyncInventoryView(wrapper.user(), inventoryTracker, (byte) ContainerID.CONTAINER_ID_INVENTORY.getValue());
-                return;
-            }
             final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
             final CreativeSlot creativeSlot = creativeSlot(inventoryTracker, slot);
             if (item.isEmpty()) {
@@ -1364,19 +1350,6 @@ public class ExperimentalFeatures {
             resyncedJavaContainers.add(container.javaContainerId());
             ExperimentalPacketFactory.sendJavaContainerSetContent(user, container);
         }
-    }
-
-    private static void resyncInventoryView(final UserConnection user, final ExperimentalInventoryTracker inventoryTracker, final byte javaContainerId) {
-        final ExperimentalContainer container = inventoryTracker.getContainerServerbound(javaContainerId);
-        if (container == null) {
-            ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
-            return;
-        }
-
-        if (container.type() != ContainerType.INVENTORY) {
-            ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
-        }
-        ExperimentalPacketFactory.sendJavaContainerSetContent(user, container);
     }
 
     private static void applyItemStackResponse(final BedrockItem item, final ItemStackResponseSlotInfo slotInfo) {
