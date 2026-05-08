@@ -71,6 +71,7 @@ public class ItemRewriter extends StoredObject {
     private final Type<BedrockItem[]> itemArrayType;
     private final Type<BedrockItem> itemInstanceType;
     private final Type<BedrockItem[]> itemInstanceArrayType;
+    private final Int2ObjectMap<BedrockItem> javaToBedrockItems = new Int2ObjectOpenHashMap<>();
 
     static {
         // TODO: Add missing item nbt rewriters
@@ -114,6 +115,39 @@ public class ItemRewriter extends StoredObject {
 
         this.itemInstanceType = new BedrockItemType(this.items.getOrDefault("minecraft:shield", 0), this.blockItemValidBlockStates, false, false);
         this.itemInstanceArrayType = new ArrayType<>(this.itemInstanceType, BedrockTypes.UNSIGNED_VAR_INT);
+
+        this.populateJavaToBedrockItems(blockStateRewriter);
+    }
+
+    private void populateJavaToBedrockItems(final BlockStateRewriter blockStateRewriter) {
+        for (Map.Entry<String, Map<Integer, BedrockMappingData.JavaItemMapping>> entry : BedrockProtocol.MAPPINGS.getBedrockToJavaMetaItems().entrySet()) {
+            final Integer bedrockId = this.items.get(entry.getKey());
+            if (bedrockId == null) {
+                continue;
+            }
+            for (Map.Entry<Integer, BedrockMappingData.JavaItemMapping> metaEntry : entry.getValue().entrySet()) {
+                final int data = metaEntry.getKey() == null ? 0 : metaEntry.getKey();
+                final BedrockItem item = new BedrockItem(bedrockId, (short) data, (byte) 1);
+                this.javaToBedrockItems.putIfAbsent(metaEntry.getValue().id(), item);
+            }
+        }
+
+        for (Map.Entry<String, Map<BlockState, BedrockMappingData.JavaItemMapping>> entry : BedrockProtocol.MAPPINGS.getBedrockToJavaBlockItems().entrySet()) {
+            final Integer bedrockId = this.items.get(entry.getKey());
+            if (bedrockId == null) {
+                continue;
+            }
+            for (Map.Entry<BlockState, BedrockMappingData.JavaItemMapping> blockEntry : entry.getValue().entrySet()) {
+                final int blockRuntimeId = blockStateRewriter.bedrockId(blockEntry.getKey());
+                if (blockRuntimeId == -1) {
+                    continue;
+                }
+
+                final BedrockItem item = new BedrockItem(bedrockId);
+                item.setBlockRuntimeId(blockRuntimeId);
+                this.javaToBedrockItems.putIfAbsent(blockEntry.getValue().id(), item);
+            }
+        }
     }
 
     public Item javaItem(final BedrockItem bedrockItem) {
@@ -240,7 +274,23 @@ public class ItemRewriter extends StoredObject {
     }
 
     public BedrockItem bedrockItem(final Item javaItem) {
-        throw new UnsupportedOperationException("Translating Java items to Bedrock is not yet supported");
+        if (javaItem == null || javaItem.isEmpty()) {
+            return BedrockItem.empty();
+        }
+
+        final BedrockItem mappedItem = this.javaToBedrockItems.get(javaItem.identifier());
+        if (mappedItem == null) {
+            final String identifier = BedrockProtocol.MAPPINGS.getJavaItems().inverse().get(javaItem.identifier());
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Missing java -> bedrock item mapping for " + identifier + " (" + javaItem.identifier() + ")");
+            return BedrockItem.empty();
+        }
+
+        final BedrockItem bedrockItem = mappedItem.copy();
+        bedrockItem.setAmount(javaItem.amount());
+        if (ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
+            ExperimentalItemRewriter.handleJavaItem(javaItem, bedrockItem);
+        }
+        return bedrockItem;
     }
 
     public BedrockItem[] bedrockItems(final Item[] javaItems) {
@@ -252,22 +302,133 @@ public class ItemRewriter extends StoredObject {
     }
 
     public int maxStackSize(final BedrockItem bedrockItem) {
-        if (bedrockItem == null || bedrockItem.isEmpty()) {
-            return 64;
-        }
-
-        final String identifier = this.items.inverse().get(bedrockItem.identifier());
-        if (identifier == null) {
-            return 64;
-        }
-
-        final ItemDefinitions.ItemDefinition itemDefinition = this.user().get(ResourcePackStorage.class).getItems().get(identifier);
+        final String identifier = this.itemIdentifier(bedrockItem);
+        final ItemDefinitions.ItemDefinition itemDefinition = this.itemDefinition(identifier);
         if (itemDefinition != null && itemDefinition.maxStackSize() != null) {
             return Math.max(1, itemDefinition.maxStackSize());
         }
 
-        CompoundTag item = BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier);
-        return item.getInt("maxStackSize", 64);
+        final CompoundTag item = this.itemData(identifier);
+        if (item != null && item.contains("maxStackSize")) {
+            return item.getInt("maxStackSize", 64);
+        }
+
+        return identifier != null ? vanillaMaxStackSize(identifier) : 64;
+    }
+
+    public boolean isDamageableItem(final BedrockItem bedrockItem) {
+        final CompoundTag item = this.itemData(this.itemIdentifier(bedrockItem));
+        return item != null && item.getBoolean("isDamageable", false);
+    }
+
+    public int maxDamage(final BedrockItem bedrockItem) {
+        final CompoundTag item = this.itemData(this.itemIdentifier(bedrockItem));
+        return item != null ? item.getInt("maxDamage", 0) : 0;
+    }
+
+    public boolean isFurnaceFuel(final BedrockItem bedrockItem) {
+        final CompoundTag item = this.itemData(this.itemIdentifier(bedrockItem));
+        return item != null && item.getFloat("furnaceBurnDuration", 0F) > 0F;
+    }
+
+    private String itemIdentifier(final BedrockItem bedrockItem) {
+        if (bedrockItem == null || bedrockItem.isEmpty()) {
+            return null;
+        }
+        return this.items.inverse().get(bedrockItem.identifier());
+    }
+
+    private ItemDefinitions.ItemDefinition itemDefinition(final String identifier) {
+        if (identifier == null) {
+            return null;
+        }
+        return this.user().get(ResourcePackStorage.class).getItems().get(identifier);
+    }
+
+    private CompoundTag itemData(final String identifier) {
+        return identifier != null ? BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier) : null;
+    }
+
+    private static int vanillaMaxStackSize(final String identifier) {
+        final String item = Key.stripMinecraftNamespace(identifier);
+        if (item.equals("ender_pearl")
+                || item.equals("snowball")
+                || item.equals("egg")
+                || item.equals("honey_bottle")
+                || item.equals("armor_stand")
+                || item.equals("written_book")
+                || item.endsWith("_sign")
+                || item.endsWith("_hanging_sign")
+                || item.endsWith("_banner")) {
+            return 16;
+        }
+
+        if (item.endsWith("_bed")
+                || item.endsWith("_boat")
+                || item.endsWith("_chest_boat")
+                || item.endsWith("_minecart")
+                || item.endsWith("_bucket")
+                || item.endsWith("_sword")
+                || item.endsWith("_shovel")
+                || item.endsWith("_pickaxe")
+                || item.endsWith("_axe")
+                || item.endsWith("_hoe")
+                || item.endsWith("_spear")
+                || item.endsWith("_helmet")
+                || item.endsWith("_chestplate")
+                || item.endsWith("_leggings")
+                || item.endsWith("_boots")
+                || item.endsWith("_horse_armor")
+                || item.equals("wolf_armor")
+                || item.startsWith("music_disc_")
+                || item.equals("bow")
+                || item.equals("crossbow")
+                || item.equals("trident")
+                || item.equals("shield")
+                || item.equals("mace")
+                || item.equals("shears")
+                || item.equals("brush")
+                || item.equals("flint_and_steel")
+                || item.equals("fishing_rod")
+                || item.equals("carrot_on_a_stick")
+                || item.equals("warped_fungus_on_a_stick")
+                || item.equals("saddle")
+                || item.equals("elytra")
+                || item.equals("enchanted_book")
+                || item.equals("potion")
+                || item.equals("splash_potion")
+                || item.equals("lingering_potion")
+                || item.equals("ominous_bottle")
+                || item.equals("mushroom_stew")
+                || item.equals("rabbit_stew")
+                || item.equals("beetroot_soup")
+                || item.equals("suspicious_stew")
+                || item.equals("cake")
+                || item.equals("totem_of_undying")
+                || item.equals("goat_horn")
+                || item.equals("spyglass")
+                || item.equals("bundle")
+                || item.equals("white_shulker_box")
+                || item.equals("orange_shulker_box")
+                || item.equals("magenta_shulker_box")
+                || item.equals("light_blue_shulker_box")
+                || item.equals("yellow_shulker_box")
+                || item.equals("lime_shulker_box")
+                || item.equals("pink_shulker_box")
+                || item.equals("gray_shulker_box")
+                || item.equals("light_gray_shulker_box")
+                || item.equals("cyan_shulker_box")
+                || item.equals("purple_shulker_box")
+                || item.equals("blue_shulker_box")
+                || item.equals("brown_shulker_box")
+                || item.equals("green_shulker_box")
+                || item.equals("red_shulker_box")
+                || item.equals("black_shulker_box")
+                || item.equals("shulker_box")) {
+            return 1;
+        }
+
+        return 64;
     }
 
     public BiMap<String, Integer> getItems() {

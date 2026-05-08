@@ -18,7 +18,6 @@
 package net.raphimc.viabedrock.experimental.model.container.block;
 
 import com.viaversion.nbt.tag.CompoundTag;
-import com.viaversion.nbt.tag.IntTag;
 import com.viaversion.nbt.tag.ShortTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
@@ -26,20 +25,20 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import net.raphimc.viabedrock.api.chunk.BedrockBlockEntity;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
-import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
-import net.raphimc.viabedrock.protocol.types.BedrockTypes;
-
-import java.util.Arrays;
 
 public class CrafterContainer extends ExperimentalContainer {
+
+    private BedrockItem resultItem = BedrockItem.empty();
 
     public CrafterContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
         super(user, containerId, ContainerType.CRAFTER, title, position, 9, CustomBlockTags.CRAFTER);
@@ -58,31 +57,54 @@ public class CrafterContainer extends ExperimentalContainer {
 
     @Override
     public FullContainerName getFullContainerName(int slot) {
-        return new FullContainerName(ContainerEnumName.AnvilInputContainer, null); // Bedrock moment, from testing they send AnvilInput
+        if (slot == 50) {
+            return new FullContainerName(ContainerEnumName.CreatedOutputContainer, null);
+        }
+        return new FullContainerName(ContainerEnumName.CrafterLevelEntityContainer, null);
+    }
+
+    @Override
+    public int javaSlot(final int slot) {
+        if (slot == 50) {
+            return 45;
+        }
+        return super.javaSlot(slot);
+    }
+
+    @Override
+    public int bedrockSlot(final int slot) {
+        if (slot == 45) {
+            return 50;
+        }
+        return super.bedrockSlot(slot);
+    }
+
+    @Override
+    public BedrockItem getItem(final int bedrockSlot) {
+        if (bedrockSlot == 50) {
+            return this.resultItem;
+        }
+        return super.getItem(bedrockSlot);
+    }
+
+    @Override
+    public boolean setItem(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot == 50) {
+            this.resultItem = item;
+            return true;
+        }
+        return super.setItem(bedrockSlot, item);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
     }
 
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        if (javaSlot >= 0 && javaSlot <= 8) {
-
-            // TODO: Minecraft wiki says it gets handled here but java currently sends a CONTAINER_SLOT_STATE_CHANGED packet which we can use instead
-
-            /*boolean[] disabledSlots = getCrafterMetadata();
-            boolean disabled = disabledSlots[javaSlot];
-            disabled = !disabled;
-
-            PacketWrapper wrapper = PacketWrapper.create(ServerboundBedrockPackets.TOGGLE_CRAFTER_SLOT_REQUEST, this.user);
-            wrapper.write(BedrockTypes.INT_LE, this.position.x());
-            wrapper.write(BedrockTypes.INT_LE, this.position.y());
-            wrapper.write(BedrockTypes.INT_LE, this.position.z());
-            wrapper.write(Types.UNSIGNED_BYTE, javaSlot);
-            wrapper.write(Types.BOOLEAN, disabled);
-            wrapper.sendToServer(BedrockProtocol.class);
-            */
-
-            return true;
-        } else if (javaSlot == 45) {
-            return true;
+        if (javaSlot == 45) {
+            return false;
         }
         return super.handleClick(revision, javaSlot, button, action);
     }
@@ -90,7 +112,8 @@ public class CrafterContainer extends ExperimentalContainer {
     private boolean[] getCrafterMetadata() {
         ChunkTracker ct = this.user.get(ChunkTracker.class);
 
-        CompoundTag tag = ct.getBlockEntity(position).tag();
+        final BedrockBlockEntity blockEntity = ct.getBlockEntity(position);
+        CompoundTag tag = blockEntity != null ? blockEntity.tag() : null;
         if (tag == null || !tag.contains("disabled_slots")) return new boolean[9];
 
         boolean[] disabledSlots = new boolean[9];

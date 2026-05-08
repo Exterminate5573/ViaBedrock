@@ -62,8 +62,8 @@ public class ShapedRecipe extends Recipe {
                 descriptor.writeJavaIngredientData(packet, user);
             }
         }
-        new ItemDescriptor.DefaultDescriptor(results.get(0).identifier(), results.get(0).auxValue()).writeJavaIngredientData(packet, user);
-        new ItemDescriptor.InvalidDescriptor().writeJavaIngredientData(packet, user); //TODO: Crafting Station
+        ItemDescriptor.writeJavaItemStackData(packet, user, results.get(0));
+        ItemDescriptor.writeJavaItemNameData(packet, user, "minecraft:crafting_table");
     }
 
     @Override

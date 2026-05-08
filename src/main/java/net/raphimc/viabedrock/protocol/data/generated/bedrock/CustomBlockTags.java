@@ -15,6 +15,7 @@ public class CustomBlockTags {
     public static final String BRUSHABLE_BLOCK = "brushable_block";
     public static final String CALIBRATED_SCULK_SENSOR = "calibrated_sculk_sensor";
     public static final String CAMPFIRE = "campfire";
+    public static final String CARTOGRAPHY_TABLE = "cartography_table";
     public static final String CAULDRON = "cauldron";
     public static final String CHEST = "chest";
     public static final String CHISELED_BOOKSHELF = "chiseled_bookshelf";
@@ -42,6 +43,7 @@ public class CustomBlockTags {
     public static final String JUKEBOX = "jukebox";
     public static final String LECTERN = "lectern";
     public static final String LODESTONE = "lodestone";
+    public static final String LOOM = "loom";
     public static final String MOB_SPAWNER = "mob_spawner";
     public static final String MOVING_BLOCK = "moving_block";
     public static final String NETHER_REACTOR = "nether_reactor";
@@ -57,6 +59,7 @@ public class CustomBlockTags {
     public static final String SMITHING_TABLE = "smithing_table";
     public static final String SMOKER = "smoker";
     public static final String SPORE_BLOSSOM = "spore_blossom";
+    public static final String STONECUTTER = "stonecutter";
     public static final String STRUCTURE_BLOCK = "structure_block";
     public static final String TRAPPED_CHEST = "trapped_chest";
     public static final String TRIAL_SPAWNER = "trial_spawner";

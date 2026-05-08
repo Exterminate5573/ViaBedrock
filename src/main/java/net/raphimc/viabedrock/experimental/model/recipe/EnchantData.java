@@ -19,4 +19,26 @@ package net.raphimc.viabedrock.experimental.model.recipe;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.Enchant_Type;
 
-public record EnchantData(int cost, Enchant_Type type, int level, int netId) {}
+import java.util.List;
+
+public record EnchantData(int cost, List<Enchantment> enchantments, int netId) {
+
+    public EnchantData {
+        enchantments = List.copyOf(enchantments);
+    }
+
+    public boolean isValid() {
+        return this.cost > 0 && this.netId > 0 && !this.enchantments.isEmpty();
+    }
+
+    public Enchant_Type type() {
+        return this.enchantments.isEmpty() ? null : this.enchantments.get(0).type();
+    }
+
+    public int level() {
+        return this.enchantments.isEmpty() ? 0 : this.enchantments.get(0).level();
+    }
+
+    public record Enchantment(Enchant_Type type, int level) {
+    }
+}

@@ -102,15 +102,20 @@ public class InventoryPackets {
             final BlockPosition position = wrapper.read(BedrockTypes.BLOCK_POSITION); // position
             wrapper.read(BedrockTypes.VAR_LONG); // entity unique id
 
-            if (inventoryTracker.isAnyScreenOpen()) {
+            if (inventoryTracker.isContainerOpen()) {
                 ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another container is open");
+                inventoryTracker.prepareForServerContainerOpen();
+            }
+            if (inventoryTracker.getCurrentForm() != null) {
+                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another screen is open");
                 PacketFactory.sendBedrockContainerClose(wrapper.user(), (byte) -1, ContainerType.NONE);
                 wrapper.cancel();
                 return;
             }
             final BedrockBlockEntity blockEntity = chunkTracker.getBlockEntity(position);
-            TextComponent title = new TranslationComponent("container." + blockStateRewriter.tag(chunkTracker.getBlockState(position)));
-            if (blockEntity != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
+            final String blockTag = blockStateRewriter.tag(chunkTracker.getBlockState(position));
+            TextComponent title = new TranslationComponent(javaContainerTitleKey(type, blockTag));
+            if (blockEntity != null && blockEntity.tag() != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
                 title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
             }
 
@@ -564,6 +569,43 @@ public class InventoryPackets {
                 dialog.getInputs().add(new Input("dummy", new BooleanInput(TextUtil.stringToTextComponent(text))));
             }
         }
+    }
+
+    private static String javaContainerTitleKey(final ContainerType type, final String blockTag) {
+        return switch (type) {
+            case ANVIL -> "container.repair";
+            case BEACON -> "container.beacon";
+            case BLAST_FURNACE -> "container.blast_furnace";
+            case BREWING_STAND -> "container.brewing";
+            case CARTOGRAPHY -> "container.cartography_table";
+            case CONTAINER -> {
+                if ("barrel".equals(blockTag)) {
+                    yield "container.barrel";
+                }
+                if ("ender_chest".equals(blockTag)) {
+                    yield "container.enderchest";
+                }
+                if (blockTag != null && blockTag.contains("shulker_box")) {
+                    yield "container.shulkerBox";
+                }
+                yield "container.chest";
+            }
+            case CRAFTER -> "container.crafter";
+            case DISPENSER -> "container.dispenser";
+            case DROPPER -> "container.dropper";
+            case ENCHANTMENT -> "container.enchant";
+            case FURNACE -> "container.furnace";
+            case GRINDSTONE -> "container.grindstone_title";
+            case HOPPER, MINECART_HOPPER -> "container.hopper";
+            case LOOM -> "container.loom";
+            case MINECART_CHEST, CHEST_BOAT -> "container.chest";
+            case SMITHING_TABLE -> "container.upgrade";
+            case SMOKER -> "container.smoker";
+            case STONECUTTER -> "container.stonecutter";
+            case WORKBENCH -> "container.crafting";
+            case ARMOR, CAULDRON, COMMAND_BLOCK, COMPOUND_CREATOR, DECORATED_POT, ELEMENT_CONSTRUCTOR, HAND, HORSE, HUD, INVENTORY, JIGSAW_EDITOR,
+                 JUKEBOX, LAB_TABLE, LECTERN, MATERIAL_REDUCER, NONE, STRUCTURE_EDITOR, TRADE -> "container.chest";
+        };
     }
 
 }

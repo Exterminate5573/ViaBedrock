@@ -24,36 +24,34 @@ import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
-import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class GrindstoneContainer extends ExperimentalContainer {
+public class CartographyContainer extends ExperimentalContainer {
 
-    public GrindstoneContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
-        super(user, containerId, ContainerType.GRINDSTONE, title, position, 3, CustomBlockTags.GRINDSTONE);
+    public CartographyContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
+        super(user, containerId, ContainerType.CARTOGRAPHY, title, position, 3, CustomBlockTags.CARTOGRAPHY_TABLE);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
-            case 16 -> new FullContainerName(ContainerEnumName.GrindstoneInputContainer, null);
-            case 17 -> new FullContainerName(ContainerEnumName.GrindstoneAdditionalContainer, null);
+            case 12 -> new FullContainerName(ContainerEnumName.CartographyInputContainer, null);
+            case 13 -> new FullContainerName(ContainerEnumName.CartographyAdditionalContainer, null);
             case 50 -> new FullContainerName(ContainerEnumName.CreatedOutputContainer, null);
-            default -> throw new IllegalArgumentException("Invalid slot index: " + slot);
+            default -> throw new IllegalArgumentException("Invalid slot for Cartography Container: " + slot);
         };
     }
 
     @Override
     public int javaSlot(final int slot) {
         return switch (slot) {
-            case 16 -> 0;
-            case 17 -> 1;
+            case 12 -> 0;
+            case 13 -> 1;
             case 50 -> 2;
             default -> super.javaSlot(slot);
         };
@@ -62,51 +60,43 @@ public class GrindstoneContainer extends ExperimentalContainer {
     @Override
     public int bedrockSlot(final int slot) {
         return switch (slot) {
-            case 0 -> 16;
-            case 1 -> 17;
+            case 0 -> 12;
+            case 1 -> 13;
             case 2 -> 50;
             default -> super.bedrockSlot(slot);
         };
     }
 
     @Override
-    public BedrockItem getItem(int bedrockSlot) {
-        // Fix magic offset
+    public BedrockItem getItem(final int bedrockSlot) {
         return switch (bedrockSlot) {
+            case 12 -> super.getItem(0);
+            case 13 -> super.getItem(1);
             case 50 -> super.getItem(2);
-            default -> super.getItem(bedrockSlot - 16);
+            default -> throw new IllegalArgumentException("Invalid slot for Cartography Container: " + bedrockSlot);
         };
     }
 
     @Override
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
-        // Fix magic offset
         return switch (bedrockSlot) {
+            case 12 -> super.setItem(0, item);
+            case 13 -> super.setItem(1, item);
             case 50 -> super.setItem(2, item);
-            default -> super.setItem(bedrockSlot - 16, item);
+            default -> throw new IllegalArgumentException("Invalid slot for Cartography Container: " + bedrockSlot);
         };
     }
 
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 2) {
-            final BedrockItem resultItem = this.getItem(50);
-            final List<ResultIngredient> ingredients = new ArrayList<>(2);
-            final BedrockItem inputItem = this.getItem(16);
-            final BedrockItem additionalItem = this.getItem(17);
-            if (!inputItem.isEmpty()) {
-                ingredients.add(new ResultIngredient(16, inputItem.amount()));
-            }
-            if (!additionalItem.isEmpty()) {
-                ingredients.add(new ResultIngredient(17, additionalItem.amount()));
-            }
             return this.handleCreatedOutputClick(
                     revision,
                     button,
                     action,
-                    resultItem,
-                    List.of(new ItemStackRequestAction.CraftGrindstoneAction(0, 1, 0)),
-                    ingredients
+                    this.getItem(50),
+                    List.of(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)),
+                    List.of(new ResultIngredient(12, 1, false), new ResultIngredient(13, 1))
             );
         }
         return super.handleClick(revision, javaSlot, button, action);
@@ -118,7 +108,8 @@ public class GrindstoneContainer extends ExperimentalContainer {
             return true;
         }
         return switch (bedrockSlot) {
-            case 16, 17 -> this.isDamageableItem(item) || this.hasEnchantmentTag(item);
+            case 12 -> this.isItem(item, "minecraft:filled_map") || item.tag() != null && item.tag().contains("map_uuid");
+            case 13 -> this.isAnyItem(item, "minecraft:paper", "minecraft:empty_map", "minecraft:glass_pane");
             case 50 -> false;
             default -> false;
         };

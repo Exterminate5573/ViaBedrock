@@ -30,7 +30,6 @@ import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
-import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapedRecipe;
 import net.raphimc.viabedrock.experimental.model.recipe.ShapelessRecipe;
 import net.raphimc.viabedrock.experimental.storage.*;
@@ -46,7 +45,6 @@ import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Level;
 
 public class CraftingTableContainer extends ExperimentalContainer {
@@ -102,126 +100,356 @@ public class CraftingTableContainer extends ExperimentalContainer {
     }
 
     @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
+    }
+
+    @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        boolean result = false;
-        if (javaSlot != 0) {
-            // Handle click first so we update the crafting grid before checking for a recipe
-            result = super.handleClick(revision, javaSlot, button, action);
-        }
         if (!ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
-            return result;
+            return super.handleClick(revision, javaSlot, button, action);
         }
-        //TODO: This is experimental code...
 
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-        CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
-        final CraftingDataStorage craftingDataStorage = tracker.getRecipeData(this, "crafting_table");
-        BedrockItem resultItem = BedrockItem.empty();
-        if (craftingDataStorage != null) {
-            // Valid recipe found, show output
-            switch (craftingDataStorage.type()) {
-                case SHAPELESS -> resultItem = ((ShapelessRecipe) craftingDataStorage.recipe()).getResults().get(0);
-                case SHAPED -> resultItem = ((ShapedRecipe) craftingDataStorage.recipe()).getResults().get(0);
-                default -> ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown recipe type for crafting: " + craftingDataStorage.type());
+        if (javaSlot == 0) {
+            final CraftingDataTracker.RecipeMatch recipeMatch = this.recipeMatch();
+            final BedrockItem resultItem = this.resultItem(recipeMatch);
+            this.updateOutputSlot(revision, resultItem);
+            if (recipeMatch == null || resultItem.isEmpty()) {
+                return false;
             }
-        } else {
-            // No valid recipe found
-            return result;
+
+            return switch (action) {
+                case PICKUP -> this.craftToCursor(revision, resultItem, recipeMatch);
+                case QUICK_MOVE -> this.craftToInventory(revision, resultItem, recipeMatch);
+                case SWAP -> this.craftToSwapDestination(revision, resultItem, recipeMatch, button);
+                default -> false;
+            };
         }
 
-        //this.setItem(0, resultItem);
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
+        final boolean result = super.handleClick(revision, javaSlot, button, action);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
+        return result;
+    }
+
+    private CraftingDataTracker.RecipeMatch recipeMatch() {
+        final CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
+        return tracker.getRecipeMatch(this, "crafting_table");
+    }
+
+    private BedrockItem resultItem(final CraftingDataTracker.RecipeMatch recipeMatch) {
+        return recipeMatch == null ? BedrockItem.empty() : this.resultItem(recipeMatch.craftingData());
+    }
+
+    private BedrockItem resultItem(final CraftingDataStorage craftingDataStorage) {
+        if (craftingDataStorage == null) {
+            return BedrockItem.empty();
+        }
+
+        return switch (craftingDataStorage.type()) {
+            case SHAPELESS -> ((ShapelessRecipe) craftingDataStorage.recipe()).getResults().get(0);
+            case SHAPED -> ((ShapedRecipe) craftingDataStorage.recipe()).getResults().get(0);
+            default -> {
+                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown recipe type for crafting: " + craftingDataStorage.type());
+                yield BedrockItem.empty();
+            }
+        };
+    }
+
+    private void updateOutputSlot(final int revision, final BedrockItem resultItem) {
+        this.setItem(50, resultItem);
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+
+        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_1.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, revision);
-        containerSlot.write(Types.SHORT, (short) 0); // Output slot
+        containerSlot.write(Types.SHORT, (short) 0);
         containerSlot.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(resultItem));
         containerSlot.send(BedrockProtocol.class);
+    }
 
-        if (javaSlot != 0) {
-            // Handle click first so we update the crafting grid before checking for a recipe
-            return result;
+    private boolean craftToCursor(final int revision, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch) {
+        final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+        final BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
+        if (!cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
+            return false;
         }
 
-        ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
-        InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, 1, requestId);
+        if (!this.remaindersFit(recipeMatch.ingredients(), inventoryTracker, 1)) {
+            return false;
+        }
+        actions.add(new ItemStackRequestAction.TakeAction(
+                resultItem.amount(),
+                ItemStackRequestSlotInfo.createdOutput(requestId),
+                ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
+        ));
 
-        List<ExperimentalContainer> prevContainers = new ArrayList<>();
+        final List<ExperimentalContainer> prevContainers = new ArrayList<>();
         prevContainers.add(this.copy());
         prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-        ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
+        final ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-        int craftableAmount = 1;
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
 
-        int bedrockSlot = this.bedrockSlot(javaSlot);
-        // TODO: shift click = max to inventory
+        if (cursorItem.isEmpty()) {
+            inventoryTracker.getHudContainer().setItem(0, resultItem.copy());
+        } else {
+            final BedrockItem newCursorItem = cursorItem.copy();
+            newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
+            inventoryTracker.getHudContainer().setItem(0, newCursorItem);
+        }
+        this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, 1);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+        return true;
+    }
 
-        List<ItemStackRequestAction> actions = new ArrayList<>();
-        actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
-        //actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(resultItems, 1)); //TODO: Deprecated action, hopefully removed in the future
+    private boolean craftToInventory(final int revision, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch) {
+        final int maxCrafts = this.maxCrafts(recipeMatch.ingredients());
+        if (maxCrafts <= 0) {
+            return false;
+        }
 
-        for (int i = 1; i <= 9; i++) {
-            int inputSlot = i + 31; // Crafting grid slots in bedrock
-            BedrockItem item = this.getItem(inputSlot);
-            if (!item.isEmpty() && item.amount() > 0) {
-                int toConsume = Math.min(item.amount(), craftableAmount);
+        final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+        final int craftLimit = this.hasCraftingRemainders(recipeMatch.ingredients()) ? 1 : maxCrafts;
+        final int crafts = this.craftsThatFit(inventoryTracker.getInventoryContainer(), resultItem, recipeMatch.ingredients(), craftLimit);
+        if (crafts <= 0) {
+            return false;
+        }
+
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, crafts, requestId);
+        this.addInventoryTransferActions(actions, inventoryTracker.getInventoryContainer(), resultItem, crafts * resultItem.amount(), requestId);
+
+        final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+        prevContainers.add(this.copy());
+        prevContainers.add(inventoryTracker.getInventoryContainer().copy());
+        final ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
+
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
+
+        this.addToInventory(inventoryTracker.getInventoryContainer(), resultItem, crafts * resultItem.amount(), true, requestId);
+        this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, crafts);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+        return true;
+    }
+
+    private boolean craftToSwapDestination(final int revision, final BedrockItem resultItem, final CraftingDataTracker.RecipeMatch recipeMatch, final byte button) {
+        final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+        final SwapDestination swapDestination = this.resultSwapDestination(button, resultItem);
+        if (swapDestination == null) {
+            return false;
+        }
+
+        final ExperimentalContainer inventoryCopy = inventoryTracker.getInventoryContainer().copy();
+        if (swapDestination.container() == inventoryTracker.getInventoryContainer()) {
+            inventoryCopy.setItem(swapDestination.bedrockSlot(), resultItem.copy());
+        }
+        if (!this.remaindersFit(recipeMatch.ingredients(), inventoryCopy, 1)) {
+            return false;
+        }
+
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = this.craftActions(recipeMatch, resultItem, 1, requestId);
+        actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
+
+        final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+        this.addPrevContainer(prevContainers, this);
+        this.addPrevContainer(prevContainers, inventoryTracker.getInventoryContainer());
+        this.addPrevContainer(prevContainers, swapDestination.container());
+        final ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
+
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
+
+        swapDestination.container().setItem(swapDestination.bedrockSlot(), resultItem.copy());
+        this.consumeIngredients(recipeMatch.ingredients(), inventoryTracker, 1);
+        this.updateOutputSlot(revision, this.resultItem(this.recipeMatch()));
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+        if (swapDestination.container() != inventoryTracker.getInventoryContainer()) {
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, swapDestination.container());
+        }
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+        return true;
+    }
+
+    private List<ItemStackRequestAction> craftActions(final CraftingDataTracker.RecipeMatch recipeMatch, final BedrockItem resultItem, final int crafts, final int requestId) {
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
+        actions.add(new ItemStackRequestAction.CraftRecipeAction(recipeMatch.craftingData().networkId(), crafts));
+        actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), crafts));
+        for (CraftingDataTracker.IngredientUse ingredient : recipeMatch.ingredients()) {
+            final int inputSlot = ingredient.bedrockSlot();
+            final BedrockItem item = this.getItem(inputSlot);
+            if (!item.isEmpty()) {
                 actions.add(new ItemStackRequestAction.ConsumeAction(
-                        toConsume,
-                        new ItemStackRequestSlotInfo(
-                                this.getFullContainerName(inputSlot),
-                                (byte) inputSlot,
-                                this.getItem(inputSlot).netId()
-                        )
+                        ingredient.count() * crafts,
+                        this.stackRequestSlotInfo(inputSlot, item.netId() != null ? item.netId() : 0)
                 ));
             }
         }
-
-        int nextRequestId = inventoryRequestTracker.nextRequestId();
-        actions.add(
-                new ItemStackRequestAction.TakeAction(
-                        craftableAmount * resultItem.amount(), // Total amount to take
-                        new ItemStackRequestSlotInfo(
-                                this.getFullContainerName(bedrockSlot),
-                                (byte) bedrockSlot,
-                                nextRequestId // TODO
-                        ),
-                        new ItemStackRequestSlotInfo(
-                                new FullContainerName(ContainerEnumName.CursorContainer, null),
-                                (byte) 0,
-                                0 // The stackNetworkId is not known yet
-                        )
-                )
-        );
-
-        ItemStackRequestInfo request = new ItemStackRequestInfo(
-                nextRequestId,
-                actions,
-                List.of(),
-                TextProcessingEventOrigin.unknown
-        );
-
-        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
-
-        inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
-        for (int i = 1; i <= 9; i++) {
-            int inputSlot = i + 31; // Crafting grid slots in bedrock
-            BedrockItem item = this.getItem(inputSlot);
-            if (!item.isEmpty() && item.amount() > 0) {
-                int toConsume = Math.min(item.amount(), craftableAmount);
-                item = item.copy();
-                item.setAmount(item.amount() - toConsume);
-                if (item.amount() > 0) {
-                    this.setItem(inputSlot, item);
-                } else {
-                    this.setItem(inputSlot, BedrockItem.empty());
-                }
-            } else {
-                this.setItem(inputSlot, BedrockItem.empty());
+        for (CraftingDataTracker.IngredientUse ingredient : recipeMatch.ingredients()) {
+            final int inputSlot = ingredient.bedrockSlot();
+            if (!this.craftingRemainder(this.getItem(inputSlot)).isEmpty()) {
+                actions.add(new ItemStackRequestAction.CreateAction(inputSlot));
             }
         }
-        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+        return actions;
+    }
 
-        //TODO: Re-Update the output slot based on remaining items in the crafting grid
+    private void addInventoryTransferActions(final List<ItemStackRequestAction> actions, final ExperimentalContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
+        int remaining = totalAmount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot : this.inventorySlots(inventory, true)) {
+                if (remaining <= 0) {
+                    break;
+                }
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
+                        : Math.min(remaining, this.maxStackSize(resultItem));
+                actions.add(new ItemStackRequestAction.TakeAction(
+                        amountToMove,
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
+                        inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                ));
+                remaining -= amountToMove;
+            }
+        }
+    }
+
+    private int craftsThatFit(final ExperimentalContainer inventory, final BedrockItem resultItem, final List<CraftingDataTracker.IngredientUse> ingredients, final int maxCrafts) {
+        for (int crafts = maxCrafts; crafts > 0; crafts--) {
+            final ExperimentalContainer inventoryCopy = inventory.copy();
+            final int totalResultAmount = crafts * resultItem.amount();
+            if (this.addToInventory(inventoryCopy, resultItem, totalResultAmount, true) != totalResultAmount) {
+                continue;
+            }
+            if (this.remaindersFit(ingredients, inventoryCopy, crafts)) {
+                return crafts;
+            }
+        }
+        return 0;
+    }
+
+    private int maxCrafts(final List<CraftingDataTracker.IngredientUse> ingredients) {
+        int maxCrafts = Integer.MAX_VALUE;
+        for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+            final BedrockItem item = this.getItem(ingredient.bedrockSlot());
+            if (!item.isEmpty() && ingredient.count() > 0) {
+                maxCrafts = Math.min(maxCrafts, item.amount() / ingredient.count());
+            }
+        }
+        return maxCrafts == Integer.MAX_VALUE ? 0 : maxCrafts;
+    }
+
+    private boolean hasCraftingRemainders(final List<CraftingDataTracker.IngredientUse> ingredients) {
+        for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+            if (!this.craftingRemainder(this.getItem(ingredient.bedrockSlot())).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean remaindersFit(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalInventoryTracker inventoryTracker, final int crafts) {
+        return this.remaindersFit(ingredients, inventoryTracker.getInventoryContainer().copy(), crafts);
+    }
+
+    private boolean remaindersFit(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalContainer inventoryCopy, final int crafts) {
+        for (int craft = 0; craft < crafts; craft++) {
+            for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+                for (int i = 0; i < ingredient.count(); i++) {
+                    final BedrockItem item = this.getItem(ingredient.bedrockSlot());
+                    final BedrockItem remainder = this.craftingRemainder(item);
+                    if (remainder.isEmpty()) {
+                        continue;
+                    }
+
+                    final BedrockItem newItem = this.itemAfterRemovingAmount(item, 1);
+                    if (newItem.isEmpty() || !newItem.isDifferent(remainder) && newItem.amount() < this.maxStackSize(newItem)) {
+                        continue;
+                    }
+                    if (this.addToInventory(inventoryCopy, remainder, remainder.amount(), true) != remainder.amount()) {
+                        return false;
+                    }
+                }
+            }
+        }
         return true;
+    }
+
+    private void consumeIngredients(final List<CraftingDataTracker.IngredientUse> ingredients, final ExperimentalInventoryTracker inventoryTracker, final int crafts) {
+        for (int craft = 0; craft < crafts; craft++) {
+            for (CraftingDataTracker.IngredientUse ingredient : ingredients) {
+                for (int i = 0; i < ingredient.count(); i++) {
+                    this.consumeIngredient(ingredient.bedrockSlot(), inventoryTracker);
+                }
+            }
+        }
+    }
+
+    private void consumeIngredient(final int inputSlot, final ExperimentalInventoryTracker inventoryTracker) {
+        final BedrockItem item = this.getItem(inputSlot);
+        if (item.isEmpty()) {
+            return;
+        }
+
+        final BedrockItem remainder = this.craftingRemainder(item);
+        final BedrockItem newItem = this.itemAfterRemovingAmount(item, 1);
+        this.setItem(inputSlot, newItem);
+        if (!remainder.isEmpty()) {
+            if (newItem.isEmpty()) {
+                this.setItem(inputSlot, remainder);
+            } else if (!newItem.isDifferent(remainder) && newItem.amount() < this.maxStackSize(newItem)) {
+                final BedrockItem mergedItem = newItem.copy();
+                mergedItem.setAmount(newItem.amount() + remainder.amount());
+                this.setItem(inputSlot, mergedItem);
+            } else {
+                this.addToInventory(inventoryTracker.getInventoryContainer(), remainder, remainder.amount(), true);
+            }
+        }
+    }
+
+    private BedrockItem craftingRemainder(final BedrockItem item) {
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
+        if ("minecraft:written_book".equals(itemName) || (itemName != null && itemName.endsWith("_banner") && item.tag() != null && item.tag().contains("Patterns"))) {
+            final BedrockItem remainder = item.copy();
+            remainder.setAmount(1);
+            return remainder;
+        }
+        final String remainderName = switch (itemName) {
+            case "minecraft:water_bucket", "minecraft:lava_bucket", "minecraft:milk_bucket" -> "minecraft:bucket";
+            case "minecraft:dragon_breath", "minecraft:honey_bottle" -> "minecraft:glass_bottle";
+            default -> null;
+        };
+        if (remainderName == null) {
+            return BedrockItem.empty();
+        }
+
+        final Integer remainderId = itemRewriter.getItems().get(remainderName);
+        if (remainderId == null) {
+            return BedrockItem.empty();
+        }
+        return new BedrockItem(remainderId);
     }
 }

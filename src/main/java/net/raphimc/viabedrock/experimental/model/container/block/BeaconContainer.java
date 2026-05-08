@@ -29,7 +29,6 @@ import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestTracker;
@@ -129,9 +128,23 @@ public class BeaconContainer extends ExperimentalContainer {
         return super.setItem(bedrockSlot - 27, item);
     }
 
+    @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
+            return false;
+        }
+
+        return super.setItems(items);
+    }
+
     public void updateEffects(int primaryEffect, int secondaryEffect) {
         InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
         ExperimentalInventoryTracker inventoryTracker = this.user.get(ExperimentalInventoryTracker.class);
+        final BedrockItem paymentItem = this.getItem(27);
+        if (paymentItem.isEmpty() || !this.canPlaceItem(27, paymentItem)) {
+            return;
+        }
 
         //TODO: This is kinda cooked, refactor later
         final String javaIdentifierPrimary = BedrockProtocol.MAPPINGS.getJavaEffects().inverse().get(primaryEffect);
@@ -143,8 +156,6 @@ public class BeaconContainer extends ExperimentalContainer {
         final int bedrockIdPrimary = bedrockIdentifierPrimary == null ? 0 : BedrockProtocol.MAPPINGS.getBedrockEffects().get(bedrockIdentifierPrimary);
         final int bedrockIdSecondary = bedrockIdentifierSecondary == null ? 0 : BedrockProtocol.MAPPINGS.getBedrockEffects().get(bedrockIdentifierSecondary);
 
-        final BedrockItem paymentItem = this.getItem(27);
-
         ItemStackRequestInfo requestInfo = new ItemStackRequestInfo(
                 inventoryRequestTracker.nextRequestId(),
                 List.of(
@@ -154,11 +165,7 @@ public class BeaconContainer extends ExperimentalContainer {
                         ),
                         new ItemStackRequestAction.DestroyAction(
                                 1,
-                                new ItemStackRequestSlotInfo(
-                                        this.getFullContainerName(27),
-                                        (byte) 27,
-                                        paymentItem.netId()
-                                )
+                                this.stackRequestSlotInfo(27, this.stackNetId(paymentItem))
                         )
                 ),
                 List.of(),
@@ -169,10 +176,39 @@ public class BeaconContainer extends ExperimentalContainer {
         prevContainers.add(this.copy());
         ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-        this.setItem(27, this.itemAfterRemovingAmount(paymentItem, 1)); // Clear the payment slot
+        this.setItem(27, this.itemAfterRemovingAmount(paymentItem, 1));
 
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(requestInfo, 0, prevCursorContainer, prevContainers));
         ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {requestInfo});
+        ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, this);
+    }
+
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot == 27 ? 1 : super.maxStackSizeForSlot(bedrockSlot, item);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot != 27) {
+            return false;
+        }
+        if (item.isEmpty()) {
+            return true;
+        }
+        return this.isAnyItem(
+                item,
+                "minecraft:emerald",
+                "minecraft:diamond",
+                "minecraft:gold_ingot",
+                "minecraft:iron_ingot",
+                "minecraft:netherite_ingot"
+        );
+    }
+
+    @Override
+    protected boolean canQuickMoveToSlot(final int bedrockSlot, final BedrockItem item) {
+        return this.canPlaceItem(bedrockSlot, item);
     }
 
 }

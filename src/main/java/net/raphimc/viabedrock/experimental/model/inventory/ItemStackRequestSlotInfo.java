@@ -17,7 +17,23 @@
  */
 package net.raphimc.viabedrock.experimental.model.inventory;
 
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public record ItemStackRequestSlotInfo(FullContainerName container, byte slot, int stackNetworkId) {
+
+    public static final byte CURSOR_SLOT = 0;
+    public static final byte CREATED_OUTPUT_SLOT = 50;
+
+    public static final FullContainerName CURSOR_CONTAINER = new FullContainerName(ContainerEnumName.CursorContainer, null);
+    public static final FullContainerName CREATED_OUTPUT_CONTAINER = new FullContainerName(ContainerEnumName.CreatedOutputContainer, null);
+
+    public static ItemStackRequestSlotInfo cursor(final int stackNetworkId) {
+        return new ItemStackRequestSlotInfo(CURSOR_CONTAINER, CURSOR_SLOT, stackNetworkId);
+    }
+
+    public static ItemStackRequestSlotInfo createdOutput(final int stackNetworkId) {
+        return new ItemStackRequestSlotInfo(CREATED_OUTPUT_CONTAINER, CREATED_OUTPUT_SLOT, stackNetworkId);
+    }
+
 }

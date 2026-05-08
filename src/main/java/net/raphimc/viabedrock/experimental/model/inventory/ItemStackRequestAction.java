@@ -18,6 +18,7 @@
 package net.raphimc.viabedrock.experimental.model.inventory;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ItemStackRequestActionType;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.ItemEntry;
 
 import java.util.List;
@@ -125,7 +126,7 @@ public interface ItemStackRequestAction {
      * This action is also sent when an item is enchanted. Enchanting should be treated mostly the same way as
      * crafting, where the old item is consumed.
      */
-    record CraftResultsDeprecatedAction(List<ItemEntry> resultItems, int timesCrafted) implements ItemStackRequestAction {
+    record CraftResultsDeprecatedAction(List<BedrockItem> resultItems, int timesCrafted) implements ItemStackRequestAction {
         @Override
         public ItemStackRequestActionType getType() {
             return ItemStackRequestActionType.CraftResults_DEPRECATEDASKTYLAING;

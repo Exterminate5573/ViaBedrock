@@ -30,6 +30,8 @@ import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotI
 import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.experimental.storage.InventoryRequestTracker;
+import net.raphimc.viabedrock.protocol.BedrockProtocol;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
@@ -38,7 +40,6 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
@@ -80,7 +81,8 @@ public abstract class ExperimentalContainer {
 
         ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-        ClickContext clickContext = new ClickContext(this, this.bedrockSlot(javaSlot), inventoryTracker, inventoryRequestTracker);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        ClickContext clickContext = new ClickContext(this, this.bedrockSlot(javaSlot), inventoryTracker, inventoryRequestTracker, requestId);
 
         /* TODO: Could potentially lead to a race condition if we receive a inventory update before the response for the request,
          *  a better solution would be to store the specific changes made in the request. From my testing this doesnt seem to happen though
@@ -89,7 +91,7 @@ public abstract class ExperimentalContainer {
 
         List<ItemStackRequestAction> itemActions = switch (action) {
             case PICKUP -> this.singletonAction(this.handlePickupClick(clickContext, javaSlot, button));
-            case SWAP -> this.singletonAction(this.handleSwapClick(clickContext, javaSlot, button));
+            case SWAP -> this.handleSwapClick(clickContext, javaSlot, button);
             case QUICK_MOVE -> this.handleQuickMoveClick(clickContext, javaSlot);
             case THROW -> this.singletonAction(this.handleThrowClick(clickContext, javaSlot, button));
             default -> List.of();
@@ -100,7 +102,7 @@ public abstract class ExperimentalContainer {
         }
 
         ItemStackRequestInfo request = new ItemStackRequestInfo(
-                clickContext.inventoryRequestTracker.nextRequestId(),
+                requestId,
                 itemActions,
                 List.of(),
                 TextProcessingEventOrigin.unknown
@@ -118,7 +120,7 @@ public abstract class ExperimentalContainer {
         BedrockItem cursorItem = clickContext.inventoryTracker.getHudContainer().getItem(0);
 
         if (javaSlot == -999) {
-            return this.dropCursorItem(clickContext.inventoryTracker, button);
+            return this.dropCursorItem(clickContext, button);
         }
 
         if (!(container instanceof InventoryContainer) && (javaSlot < 0 || javaSlot >= container.getItems().length)) {
@@ -171,8 +173,6 @@ public abstract class ExperimentalContainer {
             }
         }
 
-        // TODO: Container Limited Slots (e.g. Furnace Fuel/Input/Output) Note: this might not be needed as the server will reject invalid moves anyway
-
         BedrockItem item = container.getItem(bedrockSlot);
         if (item.isEmpty() && cursorItem.isEmpty()) {
             return null;
@@ -182,9 +182,7 @@ public abstract class ExperimentalContainer {
             return this.handlePickupTake(clickContext, container, bedrockSlot, button, item);
         }
 
-        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
-
-        if (item.isEmpty() || (!item.isDifferent(cursorItem) && item.amount() < itemRewriter.maxStackSize(item))) {
+        if (item.isEmpty() || (!item.isDifferent(cursorItem) && item.amount() < container.maxStackSizeForSlot(bedrockSlot, cursorItem))) {
             return this.handlePickupPlace(clickContext, container, bedrockSlot, button, cursorItem, item);
         }
 
@@ -195,23 +193,33 @@ public abstract class ExperimentalContainer {
         int amountToTake = button == 0 ? item.amount() : (item.amount() + 1) / 2;
 
         BedrockItem finalCursorItem = this.copyStackWithAmount(item, amountToTake);
+        this.markModifiedByRequest(finalCursorItem, clickContext.requestId);
         clickContext.inventoryTracker.getHudContainer().setItem(0, finalCursorItem);
 
         BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToTake);
+        this.markModifiedByRequest(finalContainerItem, clickContext.requestId);
         container.setItem(bedrockSlot, finalContainerItem);
 
         return new ItemStackRequestAction.TakeAction(
                 amountToTake,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, finalCursorItem.netId()),
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, 0)
+                container.stackRequestSlotInfo(bedrockSlot, this.stackNetId(item)),
+                ItemStackRequestSlotInfo.cursor(0)
         );
     }
 
     private ItemStackRequestAction handlePickupPlace(final ClickContext clickContext, final ExperimentalContainer container, final int bedrockSlot, final byte button, final BedrockItem cursorItem, final BedrockItem item) {
-        int amt = button == 0 ? cursorItem.amount() : 1;
-        int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(64 - item.amount(), cursorItem.amount());
+        if (!container.canPlaceItem(bedrockSlot, cursorItem)) {
+            return null;
+        }
 
-        final int containerNetId = item.netId() != null ? item.netId() : 0;
+        int amt = button == 0 ? cursorItem.amount() : 1;
+        final int slotMaxStackSize = container.maxStackSizeForSlot(bedrockSlot, cursorItem);
+        int amountToPlace = item.isDifferent(cursorItem) ? Math.min(amt, slotMaxStackSize) : Math.min(slotMaxStackSize - item.amount(), cursorItem.amount());
+        if (amountToPlace <= 0) {
+            return null;
+        }
+
+        final int containerNetId = this.stackNetId(item);
         BedrockItem finalContainerItem = item.copy();
         if (item.isDifferent(cursorItem)) {
             finalContainerItem = cursorItem.copy();
@@ -219,74 +227,162 @@ public abstract class ExperimentalContainer {
         } else {
             finalContainerItem.setAmount(item.amount() + amountToPlace);
         }
+        this.markModifiedByRequest(finalContainerItem, clickContext.requestId);
         container.setItem(bedrockSlot, finalContainerItem);
 
-        final int cursorNetId = cursorItem.netId();
+        final int cursorNetId = this.stackNetId(cursorItem);
         BedrockItem finalCursorItem = this.itemAfterRemovingAmount(cursorItem, amountToPlace);
+        this.markModifiedByRequest(finalCursorItem, clickContext.requestId);
         clickContext.inventoryTracker.getHudContainer().setItem(0, finalCursorItem);
 
         return new ItemStackRequestAction.PlaceAction(
                 amountToPlace,
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, cursorNetId),
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, containerNetId)
+                ItemStackRequestSlotInfo.cursor(cursorNetId),
+                container.stackRequestSlotInfo(bedrockSlot, containerNetId)
         );
     }
 
     private ItemStackRequestAction handlePickupSwap(final ClickContext clickContext, final ExperimentalContainer container, final int bedrockSlot, final BedrockItem cursorItem, final BedrockItem item) {
+        if (!container.canPlaceItem(bedrockSlot, cursorItem) || cursorItem.amount() > container.maxStackSizeForSlot(bedrockSlot, cursorItem)) {
+            return null;
+        }
+
         BedrockItem cursorCopy = cursorItem.copy();
         BedrockItem itemCopy = item.copy();
+        this.markModifiedByRequest(cursorCopy, clickContext.requestId);
+        this.markModifiedByRequest(itemCopy, clickContext.requestId);
 
         container.setItem(bedrockSlot, cursorCopy);
         clickContext.inventoryTracker.getHudContainer().setItem(0, itemCopy);
 
         return new ItemStackRequestAction.SwapAction(
-                new ItemStackRequestSlotInfo(clickContext.inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, cursorItem.netId()),
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId())
+                ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem)),
+                container.stackRequestSlotInfo(bedrockSlot, this.stackNetId(item))
         );
     }
 
-    private ItemStackRequestAction handleSwapClick(final ClickContext clickContext, final short javaSlot, final byte button) {
-        if (button < 0 || button > 8) {
-            // TODO: Handle offhand
-            return null;
+    private List<ItemStackRequestAction> handleSwapClick(final ClickContext clickContext, final short javaSlot, final byte button) {
+        final boolean offhandSwap = button == 40;
+        if (!offhandSwap && (button < 0 || button > 8)) {
+            return List.of();
         }
 
-        ExperimentalContainer container = clickContext.container;
-        if (javaSlot < 0 || javaSlot >= container.getItems().length) {
-            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle swap for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
-            return null;
+        final SlotRef source = this.resolveJavaSlot(clickContext, javaSlot);
+        if (source == null) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle swap for " + clickContext.container.type() + ", but slot was out of bounds (" + javaSlot + ")");
+            return List.of();
         }
 
-        ExperimentalContainer hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
+        ExperimentalContainer container = source.container();
+        clickContext.container = container;
+        clickContext.bedrockSlot = source.bedrockSlot();
+
+        ExperimentalContainer swapContainer = offhandSwap ? clickContext.inventoryTracker.getOffhandContainer() : clickContext.inventoryTracker.getInventoryContainer();
+        final int swapBedrockSlot = offhandSwap ? 0 : button;
+        if (container == swapContainer && clickContext.bedrockSlot == swapBedrockSlot) {
+            return List.of();
+        }
+        this.addPrevContainer(clickContext, container);
+        this.addPrevContainer(clickContext, swapContainer);
 
         BedrockItem item = container.getItem(clickContext.bedrockSlot).copy();
-        BedrockItem hotbarItem = hotbarContainer.getItem(button).copy();
+        BedrockItem swapItem = swapContainer.getItem(swapBedrockSlot).copy();
 
-        if (item.isEmpty() && hotbarItem.isEmpty()) {
-            return null;
+        if (item.isEmpty() && swapItem.isEmpty()) {
+            return List.of();
         }
 
-        container.setItem(clickContext.bedrockSlot, hotbarItem);
-        hotbarContainer.setItem(button, item);
+        if (swapItem.isEmpty()) {
+            if (!swapContainer.canPlaceItem(swapBedrockSlot, item) || item.amount() > swapContainer.maxStackSizeForSlot(swapBedrockSlot, item)) {
+                return List.of();
+            }
 
-        if (hotbarItem.isEmpty()) {
-            return new ItemStackRequestAction.PlaceAction(
+            container.setItem(clickContext.bedrockSlot, BedrockItem.empty());
+            this.markModifiedByRequest(item, clickContext.requestId);
+            swapContainer.setItem(swapBedrockSlot, item);
+            return List.of(new ItemStackRequestAction.PlaceAction(
                     item.amount(),
-                    new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId()),
-                    new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, 0)
-            );
-        } else if (item.isEmpty()) {
-            return new ItemStackRequestAction.PlaceAction(
-                    hotbarItem.amount(),
-                    new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, hotbarItem.netId()),
-                    new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, 0)
-            );
+                    container.stackRequestSlotInfo(clickContext.bedrockSlot, this.stackNetId(item)),
+                    swapContainer.stackRequestSlotInfo(swapBedrockSlot, 0)
+            ));
         }
 
-        return new ItemStackRequestAction.SwapAction(
-                new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, hotbarItem.netId()),
-                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId())
-        );
+        if (!container.canPlaceItem(clickContext.bedrockSlot, swapItem)) {
+            return List.of();
+        }
+
+        final int targetMaxStackSize = container.maxStackSizeForSlot(clickContext.bedrockSlot, swapItem);
+        if (targetMaxStackSize <= 0) {
+            return List.of();
+        }
+
+        if (item.isEmpty()) {
+            final int amountToMove = Math.min(swapItem.amount(), targetMaxStackSize);
+            final BedrockItem newContainerItem = this.copyStackWithAmount(swapItem, amountToMove);
+            final BedrockItem newSwapItem = this.itemAfterRemovingAmount(swapItem, amountToMove);
+            this.markModifiedByRequest(newContainerItem, clickContext.requestId);
+            this.markModifiedByRequest(newSwapItem, clickContext.requestId);
+            container.setItem(clickContext.bedrockSlot, newContainerItem);
+            swapContainer.setItem(swapBedrockSlot, newSwapItem);
+            return List.of(new ItemStackRequestAction.PlaceAction(
+                    amountToMove,
+                    swapContainer.stackRequestSlotInfo(swapBedrockSlot, this.stackNetId(swapItem)),
+                    container.stackRequestSlotInfo(clickContext.bedrockSlot, 0)
+            ));
+        }
+
+        if (!swapContainer.canPlaceItem(swapBedrockSlot, item)) {
+            return List.of();
+        }
+        if (swapItem.amount() <= targetMaxStackSize) {
+            if (item.amount() > swapContainer.maxStackSizeForSlot(swapBedrockSlot, item)) {
+                return List.of();
+            }
+
+            this.markModifiedByRequest(swapItem, clickContext.requestId);
+            this.markModifiedByRequest(item, clickContext.requestId);
+            container.setItem(clickContext.bedrockSlot, swapItem);
+            swapContainer.setItem(swapBedrockSlot, item);
+            return List.of(new ItemStackRequestAction.SwapAction(
+                    swapContainer.stackRequestSlotInfo(swapBedrockSlot, this.stackNetId(swapItem)),
+                    container.stackRequestSlotInfo(clickContext.bedrockSlot, this.stackNetId(item))
+            ));
+        }
+
+        if (!clickContext.inventoryTracker.getHudContainer().getItem(0).isEmpty()) {
+            return List.of();
+        }
+
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
+        actions.add(new ItemStackRequestAction.TakeAction(
+                item.amount(),
+                container.stackRequestSlotInfo(clickContext.bedrockSlot, this.stackNetId(item)),
+                ItemStackRequestSlotInfo.cursor(0)
+        ));
+
+        actions.add(new ItemStackRequestAction.PlaceAction(
+                targetMaxStackSize,
+                swapContainer.stackRequestSlotInfo(swapBedrockSlot, this.stackNetId(swapItem)),
+                container.stackRequestSlotInfo(clickContext.bedrockSlot, 0)
+        ));
+        final BedrockItem newContainerItem = this.copyStackWithAmount(swapItem, targetMaxStackSize);
+        final BedrockItem newSwapItem = this.itemAfterRemovingAmount(swapItem, targetMaxStackSize);
+        this.markModifiedByRequest(newContainerItem, clickContext.requestId);
+        this.markModifiedByRequest(newSwapItem, clickContext.requestId);
+        container.setItem(clickContext.bedrockSlot, newContainerItem);
+        swapContainer.setItem(swapBedrockSlot, newSwapItem);
+
+        final InventoryContainer inventory = clickContext.inventoryTracker.getInventoryContainer();
+        this.addPrevContainer(clickContext, inventory);
+        final int movedToInventory = this.addCursorToInventoryActions(actions, inventory, item, item.amount(), true, clickContext.requestId);
+        if (movedToInventory < item.amount()) {
+            actions.add(new ItemStackRequestAction.DropAction(
+                    item.amount() - movedToInventory,
+                    ItemStackRequestSlotInfo.cursor(this.stackNetId(item)),
+                    false
+            ));
+        }
+        return actions;
     }
 
     private List<ItemStackRequestAction> handleQuickMoveClick(final ClickContext clickContext, final short javaSlot) {
@@ -300,8 +396,6 @@ public abstract class ExperimentalContainer {
             return List.of();
         }
 
-        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
-
         final List<ItemStackRequestAction> actions = new ArrayList<>();
         final List<QuickMoveRange> ranges = this.quickMoveRanges(javaSlot, source);
         for (boolean mergePass : new boolean[]{true, false}) {
@@ -314,17 +408,17 @@ public abstract class ExperimentalContainer {
                     if (source.container() == range.container() && source.bedrockSlot() == bedrockDestSlot) {
                         continue;
                     }
-                    /*if (!range.container().canQuickMoveToSlot(bedrockDestSlot, sourceItem)) {
+                    if (!range.container().canQuickMoveToSlot(bedrockDestSlot, sourceItem)) {
                         continue;
-                    }*/
+                    }
 
                     final BedrockItem destinationItem = range.container().getItem(bedrockDestSlot);
-                    final int slotMaxStackSize = itemRewriter.maxStackSize(destinationItem);
+                    final int slotMaxStackSize = range.container().maxStackSizeForSlot(bedrockDestSlot, sourceItem);
                     if (mergePass) {
-                        if (destinationItem == null || destinationItem.isEmpty() || destinationItem.isDifferent(sourceItem) || destinationItem.amount() >= slotMaxStackSize) {
+                        if (destinationItem.isEmpty() || destinationItem.isDifferent(sourceItem) || destinationItem.amount() >= slotMaxStackSize) {
                             continue;
                         }
-                    } else if (destinationItem != null && !destinationItem.isEmpty()) {
+                    } else if (!destinationItem.isEmpty()) {
                         continue;
                     }
 
@@ -335,25 +429,26 @@ public abstract class ExperimentalContainer {
                         continue;
                     }
 
-                    int destNetId = destinationItem != null && !destinationItem.isEmpty() ? destinationItem.netId() : 0;
-
-                    clickContext.prevContainers.add(source.container());
-                    clickContext.prevContainers.add(range.container());
+                    this.addPrevContainer(clickContext, source.container());
+                    this.addPrevContainer(clickContext, range.container());
                     actions.add(new ItemStackRequestAction.PlaceAction(
                             amountToMove,
-                            new ItemStackRequestSlotInfo(source.container().getFullContainerName(source.bedrockSlot()), (byte) source.bedrockSlot(), sourceItem.netId()),
-                            new ItemStackRequestSlotInfo(range.container().getFullContainerName(bedrockDestSlot), (byte) bedrockDestSlot, destNetId)
+                            source.container().stackRequestSlotInfo(source.bedrockSlot(), this.stackNetId(sourceItem)),
+                            range.container().stackRequestSlotInfo(bedrockDestSlot, this.stackNetId(destinationItem))
                     ));
 
                     final BedrockItem newSourceItem = this.itemAfterRemovingAmount(sourceItem, amountToMove);
+                    this.markModifiedByRequest(newSourceItem, clickContext.requestId);
                     source.container().setItem(source.bedrockSlot(), newSourceItem);
                     if (destinationItem == null || destinationItem.isEmpty()) {
                         final BedrockItem newDestinationItem = sourceItem.copy();
                         newDestinationItem.setAmount(amountToMove);
+                        this.markModifiedByRequest(newDestinationItem, clickContext.requestId);
                         range.container().setItem(bedrockDestSlot, newDestinationItem);
                     } else {
                         final BedrockItem newDestinationItem = destinationItem.copy();
                         newDestinationItem.setAmount(destinationItem.amount() + amountToMove);
+                        this.markModifiedByRequest(newDestinationItem, clickContext.requestId);
                         range.container().setItem(bedrockDestSlot, newDestinationItem);
                     }
                     sourceItem = newSourceItem;
@@ -364,72 +459,6 @@ public abstract class ExperimentalContainer {
         return actions;
     }
 
-    private ItemStackRequestAction handleThrowClick(final ClickContext clickContext, final short javaSlot, final byte button) {
-        if (javaSlot == -999) {
-            return this.dropCursorItem(clickContext.inventoryTracker, button);
-        }
-
-        ExperimentalContainer container = clickContext.container;
-        if (javaSlot < 0 || javaSlot >= container.getItems().length) {
-            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle throw for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
-            return null;
-        }
-
-        BedrockItem item = container.getItem(clickContext.bedrockSlot);
-
-        if (item.isEmpty()) {
-            return null;
-        }
-
-        int amountToDrop = button == 0 ? 1 : item.amount();
-
-        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
-        container.setItem(clickContext.bedrockSlot, finalContainerItem);
-
-        return new ItemStackRequestAction.DropAction(
-                amountToDrop,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId()),
-                false
-        );
-    }
-
-    private ItemStackRequestAction dropCursorItem(final ExperimentalInventoryTracker inventoryTracker, final byte button) {
-        BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
-        if (cursorItem.isEmpty()) {
-            return null;
-        }
-
-        int amountToDrop = button == 0 ? cursorItem.amount() : 1;
-        inventoryTracker.getHudContainer().setItem(0, this.itemAfterRemovingAmount(cursorItem, amountToDrop));
-
-        return new ItemStackRequestAction.DropAction(
-                amountToDrop,
-                new ItemStackRequestSlotInfo(inventoryTracker.getHudContainer().getFullContainerName(0), (byte) 0, cursorItem.netId()),
-                false
-        );
-    }
-
-    protected ItemStackRequestAction dropItem(final ExperimentalContainer container, final int bedrockSlot, final int amountToDrop) {
-        BedrockItem item = container.getItem(bedrockSlot);
-        if (item.isEmpty()) {
-            return null;
-        }
-
-        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
-        container.setItem(bedrockSlot, finalContainerItem);
-
-        return new ItemStackRequestAction.DropAction(
-                amountToDrop,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId()),
-                false
-        );
-    }
-
-    private List<ItemStackRequestAction> singletonAction(final ItemStackRequestAction action) {
-        return action == null ? List.of() : List.of(action);
-    }
-
-    // TODO: Move this to per-class override?
     private List<QuickMoveRange> quickMoveRanges(final short javaSlot, final SlotRef source) {
         final ExperimentalInventoryTracker inventoryTracker = this.user.get(ExperimentalInventoryTracker.class);
         final InventoryContainer inventory = inventoryTracker.getInventoryContainer();
@@ -460,17 +489,17 @@ public abstract class ExperimentalContainer {
         }
 
         final BedrockItem sourceItem = source.container().getItem(source.bedrockSlot());
-        return switch (this.type) {
-            case FURNACE, BLAST_FURNACE, SMOKER -> /*this.isFurnaceFuel(sourceItem)
+        final List<QuickMoveRange> containerRanges = switch (this.type) {
+            case FURNACE, BLAST_FURNACE, SMOKER -> this.isFurnaceFuel(sourceItem)
                     ? List.of(new QuickMoveRange(this, 1, 2, false), new QuickMoveRange(this, 0, 1, false))
-                    :*/ List.of(new QuickMoveRange(this, 0, 1, false), new QuickMoveRange(this, 1, 2, false));
+                    : List.of(new QuickMoveRange(this, 0, 1, false), new QuickMoveRange(this, 1, 2, false));
             case BREWING_STAND -> {
-                /*if (this.isItem(sourceItem, "minecraft:blaze_powder")) {
+                if (this.isItem(sourceItem, "minecraft:blaze_powder")) {
                     yield List.of(new QuickMoveRange(this, 4, 5, false));
                 }
                 if (this.isBrewingBottle(sourceItem)) {
                     yield List.of(new QuickMoveRange(this, 0, 3, false));
-                }*/
+                }
                 yield List.of(new QuickMoveRange(this, 3, 4, false));
             }
             case BEACON -> List.of(new QuickMoveRange(this, 0, 1, false));
@@ -485,6 +514,36 @@ public abstract class ExperimentalContainer {
             case CRAFTER -> List.of(new QuickMoveRange(this, 0, 9, false));
             default -> List.of(new QuickMoveRange(this, 0, this.size(), false));
         };
+        if (this.hasQuickMoveTarget(containerRanges, sourceItem)) {
+            return containerRanges;
+        }
+        return this.playerInventoryFallbackQuickMoveRanges(javaSlot, inventory);
+    }
+
+    private boolean hasQuickMoveTarget(final List<QuickMoveRange> ranges, final BedrockItem sourceItem) {
+        for (QuickMoveRange range : ranges) {
+            final int start = range.backwards() ? range.endJavaSlot() - 1 : range.startJavaSlot();
+            final int end = range.backwards() ? range.startJavaSlot() - 1 : range.endJavaSlot();
+            final int step = range.backwards() ? -1 : 1;
+            for (int javaDestSlot = start; javaDestSlot != end; javaDestSlot += step) {
+                if (range.container().canQuickMoveToSlot(range.container().bedrockSlot(javaDestSlot), sourceItem)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private List<QuickMoveRange> playerInventoryFallbackQuickMoveRanges(final short javaSlot, final InventoryContainer inventory) {
+        final int menuInventoryStart = this.size();
+        final int menuHotbarStart = menuInventoryStart + 27;
+        if (javaSlot >= menuInventoryStart && javaSlot < menuHotbarStart) {
+            return List.of(new QuickMoveRange(inventory, 36, 45, false));
+        }
+        if (javaSlot >= menuHotbarStart && javaSlot < menuHotbarStart + 9) {
+            return List.of(new QuickMoveRange(inventory, 9, 36, false));
+        }
+        return List.of();
     }
 
     private QuickMoveRange equipmentQuickMoveRange(final SlotRef source, final ExperimentalInventoryTracker inventoryTracker) {
@@ -502,7 +561,6 @@ public abstract class ExperimentalContainer {
         return null;
     }
 
-    // TODO: Delete this
     private int equipmentJavaSlot(final BedrockItem item) {
         if (item.isEmpty()) {
             return -1;
@@ -540,7 +598,9 @@ public abstract class ExperimentalContainer {
         ExperimentalContainer container = clickContext.container;
         int bedrockSlot = clickContext.bedrockSlot;
         final ExperimentalInventoryTracker inventoryTracker = clickContext.inventoryTracker;
-
+        if (container.type() == ContainerType.CRAFTER && javaSlot == 45) {
+            return new SlotRef(container, container.bedrockSlot(javaSlot));
+        }
         if (!(container instanceof InventoryContainer) && (javaSlot < 0 || javaSlot >= container.getItems().length)) {
             final ExperimentalContainer inventoryContainer = inventoryTracker.getInventoryContainer();
             final int invSlot = inventoryContainer.bedrockSlot(javaSlot - container.getItems().length + 9);
@@ -566,10 +626,255 @@ public abstract class ExperimentalContainer {
         return new SlotRef(container, bedrockSlot);
     }
 
-    private BedrockItem copyStackWithAmount(final BedrockItem item, final int amount) {
+    protected int maxStackSize(final BedrockItem item) {
+        return this.user.get(ItemRewriter.class).maxStackSize(item);
+    }
+
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        return this.maxStackSize(item);
+    }
+
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return true;
+    }
+
+    protected boolean canQuickMoveToSlot(final int bedrockSlot, final BedrockItem item) {
+        return this.canPlaceItem(bedrockSlot, item);
+    }
+
+    protected String itemIdentifier(final BedrockItem item) {
+        if (item == null || item.isEmpty()) {
+            return null;
+        }
+        return this.user.get(ItemRewriter.class).getItems().inverse().get(item.identifier());
+    }
+
+    protected boolean isItem(final BedrockItem item, final String identifier) {
+        return identifier.equals(this.itemIdentifier(item));
+    }
+
+    protected boolean isAnyItem(final BedrockItem item, final String... identifiers) {
+        final String itemIdentifier = this.itemIdentifier(item);
+        if (itemIdentifier == null) {
+            return false;
+        }
+        for (String identifier : identifiers) {
+            if (identifier.equals(itemIdentifier)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected boolean itemNameEndsWith(final BedrockItem item, final String suffix) {
+        final String identifier = this.itemIdentifier(item);
+        return identifier != null && identifier.endsWith(suffix);
+    }
+
+    protected boolean hasItemTag(final BedrockItem item, final String tag) {
+        final String identifier = this.itemIdentifier(item);
+        if (identifier == null) {
+            return false;
+        }
+        final Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(identifier);
+        return tags != null && tags.contains(tag);
+    }
+
+    protected boolean hasEnchantmentTag(final BedrockItem item) {
+        return item.tag() != null && item.tag().contains("ench");
+    }
+
+    protected boolean isDamageableItem(final BedrockItem item) {
+        return this.user.get(ItemRewriter.class).isDamageableItem(item);
+    }
+
+    protected int maxDamage(final BedrockItem item) {
+        return this.user.get(ItemRewriter.class).maxDamage(item);
+    }
+
+    protected boolean isFurnaceFuel(final BedrockItem item) {
+        return this.user.get(ItemRewriter.class).isFurnaceFuel(item);
+    }
+
+    protected boolean isBrewingBottle(final BedrockItem item) {
+        return this.isAnyItem(item, "minecraft:potion", "minecraft:splash_potion", "minecraft:lingering_potion", "minecraft:glass_bottle");
+    }
+
+    private void addPrevContainer(final ClickContext clickContext, final ExperimentalContainer container) {
+        this.addPrevContainer(clickContext.prevContainers, container);
+    }
+
+    protected void addPrevContainer(final List<ExperimentalContainer> prevContainers, final ExperimentalContainer container) {
+        for (ExperimentalContainer prevContainer : prevContainers) {
+            if (prevContainer.containerId() == container.containerId()) {
+                return;
+            }
+        }
+        prevContainers.add(container.copy());
+    }
+
+    private ItemStackRequestAction handleThrowClick(final ClickContext clickContext, final short javaSlot, final byte button) {
+        if (javaSlot == -999) {
+            return this.dropCursorItem(clickContext, button);
+        }
+
+        final SlotRef source = this.resolveJavaSlot(clickContext, javaSlot);
+        if (source == null) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle throw for " + clickContext.container.type() + ", but slot was out of bounds (" + javaSlot + ")");
+            return null;
+        }
+
+        ExperimentalContainer container = source.container();
+        int bedrockSlot = source.bedrockSlot();
+        this.addPrevContainer(clickContext, container);
+
+        BedrockItem item = container.getItem(bedrockSlot);
+
+        if (item.isEmpty()) {
+            return null;
+        }
+
+        int amountToDrop = button == 0 ? 1 : item.amount();
+
+        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
+        this.markModifiedByRequest(finalContainerItem, clickContext.requestId);
+        container.setItem(bedrockSlot, finalContainerItem);
+
+        return new ItemStackRequestAction.DropAction(
+                amountToDrop,
+                container.stackRequestSlotInfo(bedrockSlot, this.stackNetId(item)),
+                false
+        );
+    }
+
+    private ItemStackRequestAction dropCursorItem(final ClickContext clickContext, final byte button) {
+        BedrockItem cursorItem = clickContext.inventoryTracker.getHudContainer().getItem(0);
+        if (cursorItem.isEmpty()) {
+            return null;
+        }
+
+        int amountToDrop = button == 0 ? cursorItem.amount() : 1;
+        final BedrockItem finalCursorItem = this.itemAfterRemovingAmount(cursorItem, amountToDrop);
+        this.markModifiedByRequest(finalCursorItem, clickContext.requestId);
+        clickContext.inventoryTracker.getHudContainer().setItem(0, finalCursorItem);
+
+        return new ItemStackRequestAction.DropAction(
+                amountToDrop,
+                ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem)),
+                false
+        );
+    }
+
+    protected ItemStackRequestAction dropItem(final ExperimentalContainer container, final int bedrockSlot, final int amountToDrop) {
+        BedrockItem item = container.getItem(bedrockSlot);
+        if (item.isEmpty()) {
+            return null;
+        }
+
+        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
+        container.setItem(bedrockSlot, finalContainerItem);
+
+        return new ItemStackRequestAction.DropAction(
+                amountToDrop,
+                container.stackRequestSlotInfo(bedrockSlot, this.stackNetId(item)),
+                false
+        );
+    }
+
+    private List<ItemStackRequestAction> singletonAction(final ItemStackRequestAction action) {
+        return action == null ? List.of() : List.of(action);
+    }
+
+    protected int stackNetId(final BedrockItem item) {
+        return item.netId() != null ? item.netId() : 0;
+    }
+
+    protected void markModifiedByRequest(final BedrockItem item, final int requestId) {
+        this.markModifiedByRequest(item, Integer.valueOf(requestId));
+    }
+
+    protected void markModifiedByRequest(final BedrockItem item, final Integer requestId) {
+        if (!item.isEmpty() && requestId != null) {
+            item.setNetId(requestId);
+        }
+    }
+
+    protected BedrockItem copyStackWithAmount(final BedrockItem item, final int amount) {
         BedrockItem copy = item.copy();
         copy.setAmount(amount);
         return copy;
+    }
+
+    protected int addToInventory(final ExperimentalContainer inventory, final BedrockItem item, final int amount, final boolean backwards) {
+        return this.addToInventory(inventory, item, amount, backwards, null);
+    }
+
+    protected int addToInventory(final ExperimentalContainer inventory, final BedrockItem item, final int amount, final boolean backwards, final Integer requestId) {
+        if (item.isEmpty() || amount <= 0) {
+            return 0;
+        }
+
+        int remaining = amount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot : this.inventorySlots(inventory, backwards)) {
+                if (remaining <= 0) {
+                    break;
+                }
+                final BedrockItem target = inventory.getItem(slot);
+                if (mergePass) {
+                    if (target.isEmpty() || target.isDifferent(item) || target.amount() >= this.maxStackSize(item)) {
+                        continue;
+                    }
+                } else if (!target.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(item) - target.amount())
+                        : Math.min(remaining, this.maxStackSize(item));
+                if (amountToMove <= 0) {
+                    continue;
+                }
+
+                if (target.isEmpty()) {
+                    final BedrockItem newTarget = this.copyStackWithAmount(item, amountToMove);
+                    this.markModifiedByRequest(newTarget, requestId);
+                    inventory.setItem(slot, newTarget);
+                } else {
+                    final BedrockItem newTarget = target.copy();
+                    newTarget.setAmount(target.amount() + amountToMove);
+                    this.markModifiedByRequest(newTarget, requestId);
+                    inventory.setItem(slot, newTarget);
+                }
+                remaining -= amountToMove;
+            }
+        }
+
+        return amount - remaining;
+    }
+
+    protected List<Integer> inventorySlots(final ExperimentalContainer inventory, final boolean backwards) {
+        final List<Integer> slots = new ArrayList<>(inventory.size());
+        if (backwards && inventory.type() == ContainerType.INVENTORY && inventory.size() == 36) {
+            for (int slot = 8; slot >= 0; slot--) {
+                slots.add(slot);
+            }
+            for (int slot = inventory.size() - 1; slot >= 9; slot--) {
+                slots.add(slot);
+            }
+            return slots;
+        }
+
+        if (backwards) {
+            for (int slot = inventory.size() - 1; slot >= 0; slot--) {
+                slots.add(slot);
+            }
+        } else {
+            for (int slot = 0; slot < inventory.size(); slot++) {
+                slots.add(slot);
+            }
+        }
+        return slots;
     }
 
     protected BedrockItem itemAfterRemovingAmount(final BedrockItem item, final int amountToRemove) {
@@ -582,19 +887,243 @@ public abstract class ExperimentalContainer {
         return copy;
     }
 
+    protected boolean handleCreatedOutputClick(final int revision, final byte button, final ContainerInput action, final BedrockItem resultItem, final List<ItemStackRequestAction> headerActions, final List<ResultIngredient> ingredients) {
+        if (action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE && action != ContainerInput.SWAP) {
+            return false;
+        }
+        if (resultItem.isEmpty()) {
+            return false;
+        }
+
+        final ExperimentalInventoryTracker inventoryTracker = this.user.get(ExperimentalInventoryTracker.class);
+        final InventoryContainer inventory = inventoryTracker.getInventoryContainer();
+        final BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
+        if (action == ContainerInput.PICKUP && !cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
+            return false;
+        }
+        if (action == ContainerInput.QUICK_MOVE && this.inventoryCapacity(inventory, resultItem) < resultItem.amount()) {
+            return false;
+        }
+        final SwapDestination swapDestination = action == ContainerInput.SWAP ? this.resultSwapDestination(button, resultItem) : null;
+        if (action == ContainerInput.SWAP && swapDestination == null) {
+            return false;
+        }
+
+        final InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
+        final int requestId = inventoryRequestTracker.nextRequestId();
+        final List<ItemStackRequestAction> actions = new ArrayList<>(headerActions);
+        actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1));
+        for (ResultIngredient ingredient : ingredients) {
+            final BedrockItem item = this.getItem(ingredient.bedrockSlot());
+            final int count = Math.min(ingredient.count(), item.amount());
+            if (ingredient.requestAction() && !item.isEmpty() && count > 0) {
+                actions.add(new ItemStackRequestAction.ConsumeAction(
+                        count,
+                        this.stackRequestSlotInfo(ingredient.bedrockSlot(), this.stackNetId(item))
+                ));
+            }
+        }
+
+        if (action == ContainerInput.PICKUP) {
+            actions.add(new ItemStackRequestAction.TakeAction(
+                    resultItem.amount(),
+                    ItemStackRequestSlotInfo.createdOutput(requestId),
+                    ItemStackRequestSlotInfo.cursor(this.stackNetId(cursorItem))
+            ));
+        } else if (action == ContainerInput.QUICK_MOVE) {
+            this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
+        } else {
+            actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
+        }
+
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+        this.addPrevContainer(prevContainers, this);
+        if (action == ContainerInput.QUICK_MOVE) {
+            this.addPrevContainer(prevContainers, inventory);
+        } else if (action == ContainerInput.SWAP) {
+            this.addPrevContainer(prevContainers, swapDestination.container());
+        }
+        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, inventoryTracker.getHudContainer().copy(), prevContainers));
+        ExperimentalPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[]{request});
+
+        for (ResultIngredient ingredient : ingredients) {
+            final BedrockItem item = this.getItem(ingredient.bedrockSlot());
+            final BedrockItem newIngredientItem = this.itemAfterRemovingAmount(item, ingredient.count());
+            this.markModifiedByRequest(newIngredientItem, requestId);
+            this.setItem(ingredient.bedrockSlot(), newIngredientItem);
+        }
+        final BedrockItem newOutputItem = this.createdOutputAfterTake(resultItem);
+        this.markModifiedByRequest(newOutputItem, requestId);
+        this.setItem(50, newOutputItem);
+
+        if (action == ContainerInput.PICKUP) {
+            if (cursorItem.isEmpty()) {
+                final BedrockItem newCursorItem = resultItem.copy();
+                this.markModifiedByRequest(newCursorItem, requestId);
+                inventoryTracker.getHudContainer().setItem(0, newCursorItem);
+            } else {
+                final BedrockItem newCursorItem = cursorItem.copy();
+                newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
+                this.markModifiedByRequest(newCursorItem, requestId);
+                inventoryTracker.getHudContainer().setItem(0, newCursorItem);
+            }
+        } else if (action == ContainerInput.QUICK_MOVE) {
+            this.addToInventory(inventory, resultItem, resultItem.amount(), true, requestId);
+            ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, inventory);
+        } else {
+            final BedrockItem newDestinationItem = resultItem.copy();
+            this.markModifiedByRequest(newDestinationItem, requestId);
+            swapDestination.container().setItem(swapDestination.bedrockSlot(), newDestinationItem);
+            ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, swapDestination.container());
+        }
+
+        ExperimentalPacketFactory.sendJavaContainerSetContent(this.user, this);
+        return true;
+    }
+
+    protected BedrockItem createdOutputAfterTake(final BedrockItem resultItem) {
+        return BedrockItem.empty();
+    }
+
+    protected SwapDestination resultSwapDestination(final byte button, final BedrockItem resultItem) {
+        final ExperimentalInventoryTracker inventoryTracker = this.user.get(ExperimentalInventoryTracker.class);
+        final ExperimentalContainer destinationContainer;
+        final int destinationSlot;
+        if (button >= 0 && button < 9) {
+            destinationContainer = inventoryTracker.getInventoryContainer();
+            destinationSlot = button;
+        } else if (button == 40) {
+            destinationContainer = inventoryTracker.getOffhandContainer();
+            destinationSlot = 0;
+        } else {
+            return null;
+        }
+
+        final BedrockItem destinationItem = destinationContainer.getItem(destinationSlot);
+        if (!destinationItem.isEmpty()) {
+            return null;
+        }
+        if (!destinationContainer.canPlaceItem(destinationSlot, resultItem) || resultItem.amount() > destinationContainer.maxStackSizeForSlot(destinationSlot, resultItem)) {
+            return null;
+        }
+        return new SwapDestination(destinationContainer, destinationSlot);
+    }
+
+    protected ItemStackRequestAction placeCreatedOutputAction(final BedrockItem resultItem, final int requestId, final SwapDestination destination) {
+        return this.takeCreatedOutputAction(resultItem, requestId, destination);
+    }
+
+    protected ItemStackRequestAction takeCreatedOutputAction(final BedrockItem resultItem, final int requestId, final SwapDestination destination) {
+        return new ItemStackRequestAction.TakeAction(
+                resultItem.amount(),
+                ItemStackRequestSlotInfo.createdOutput(requestId),
+                destination.container().stackRequestSlotInfo(destination.bedrockSlot(), 0)
+        );
+    }
+
+    private void addOutputToInventoryActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
+        int remaining = totalAmount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot : this.inventorySlots(inventory, true)) {
+                if (remaining <= 0) {
+                    break;
+                }
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
+                        : Math.min(remaining, this.maxStackSize(resultItem));
+                actions.add(new ItemStackRequestAction.TakeAction(
+                        amountToMove,
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
+                        inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
+                ));
+                remaining -= amountToMove;
+            }
+        }
+    }
+
+    private int addCursorToInventoryActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem item, final int totalAmount, final boolean backwards, final int requestId) {
+        int remaining = totalAmount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot : this.inventorySlots(inventory, backwards)) {
+                if (remaining <= 0) {
+                    break;
+                }
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(item) || destinationItem.amount() >= this.maxStackSize(item)) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(item) - destinationItem.amount())
+                        : Math.min(remaining, this.maxStackSize(item));
+                if (amountToMove <= 0) {
+                    continue;
+                }
+
+                actions.add(new ItemStackRequestAction.PlaceAction(
+                        amountToMove,
+                        ItemStackRequestSlotInfo.cursor(this.stackNetId(item)),
+                        inventory.stackRequestSlotInfo(slot, this.stackNetId(destinationItem))
+                ));
+
+                if (destinationItem.isEmpty()) {
+                    final BedrockItem newDestinationItem = this.copyStackWithAmount(item, amountToMove);
+                    this.markModifiedByRequest(newDestinationItem, requestId);
+                    inventory.setItem(slot, newDestinationItem);
+                } else {
+                    final BedrockItem newDestinationItem = destinationItem.copy();
+                    newDestinationItem.setAmount(destinationItem.amount() + amountToMove);
+                    this.markModifiedByRequest(newDestinationItem, requestId);
+                    inventory.setItem(slot, newDestinationItem);
+                }
+                remaining -= amountToMove;
+            }
+        }
+        return totalAmount - remaining;
+    }
+
+    protected int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
+        int capacity = 0;
+        for (int slot = inventory.size() - 1; slot >= 0; slot--) {
+            final BedrockItem item = inventory.getItem(slot);
+            if (item.isEmpty()) {
+                capacity += this.maxStackSize(resultItem);
+            } else if (!item.isDifferent(resultItem)) {
+                capacity += this.maxStackSize(resultItem) - item.amount();
+            }
+        }
+        return capacity;
+    }
+
     private static final class ClickContext {
         private ExperimentalContainer container;
         private int bedrockSlot;
         private final ExperimentalInventoryTracker inventoryTracker;
         private final InventoryRequestTracker inventoryRequestTracker;
+        private final int requestId;
         private final List<ExperimentalContainer> prevContainers = new ArrayList<>();
         private final ExperimentalContainer prevCursorContainer;
 
-        private ClickContext(final ExperimentalContainer container, final int bedrockSlot, final ExperimentalInventoryTracker inventoryTracker, final InventoryRequestTracker inventoryRequestTracker) {
+        private ClickContext(final ExperimentalContainer container, final int bedrockSlot, final ExperimentalInventoryTracker inventoryTracker, final InventoryRequestTracker inventoryRequestTracker, final int requestId) {
             this.container = container;
             this.bedrockSlot = bedrockSlot;
             this.inventoryTracker = inventoryTracker;
             this.inventoryRequestTracker = inventoryRequestTracker;
+            this.requestId = requestId;
             this.prevCursorContainer = inventoryTracker.getHudContainer().copy();
         }
     }
@@ -603,6 +1132,15 @@ public abstract class ExperimentalContainer {
     }
 
     private record QuickMoveRange(ExperimentalContainer container, int startJavaSlot, int endJavaSlot, boolean backwards) {
+    }
+
+    protected record SwapDestination(ExperimentalContainer container, int bedrockSlot) {
+    }
+
+    public record ResultIngredient(int bedrockSlot, int count, boolean requestAction) {
+        public ResultIngredient(final int bedrockSlot, final int count) {
+            this(bedrockSlot, count, true);
+        }
     }
 
     public boolean handleButtonClick(final int button) {
@@ -628,7 +1166,7 @@ public abstract class ExperimentalContainer {
     }
 
     public BedrockItem[] getItems() {
-        return Arrays.copyOf(this.items, this.items.length);
+        return this.copyItems();
     }
 
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
@@ -649,7 +1187,9 @@ public abstract class ExperimentalContainer {
             return false;
         }
 
-        System.arraycopy(items, 0, this.items, 0, items.length);
+        for (int i = 0; i < items.length; i++) {
+            this.items[i] = items[i] != null ? items[i].copy() : BedrockItem.empty();
+        }
         return true;
     }
 
@@ -659,6 +1199,18 @@ public abstract class ExperimentalContainer {
 
     public int bedrockSlot(final int javaSlot) {
         return javaSlot;
+    }
+
+    public int stackRequestSlot(final int bedrockSlot) {
+        return bedrockSlot;
+    }
+
+    public int bedrockSlotFromStackRequest(final int requestSlot) {
+        return requestSlot;
+    }
+
+    public ItemStackRequestSlotInfo stackRequestSlotInfo(final int bedrockSlot, final int stackNetId) {
+        return new ItemStackRequestSlotInfo(this.getFullContainerName(bedrockSlot), (byte) this.stackRequestSlot(bedrockSlot), stackNetId);
     }
 
     public byte javaContainerId() {
@@ -697,17 +1249,39 @@ public abstract class ExperimentalContainer {
     }
 
     public ExperimentalContainer copy() { // TODO: This probably isnt the best way to do this
-        BedrockItem[] itemsCopy = Arrays.copyOf(this.items, this.items.length);
+        BedrockItem[] itemsCopy = this.copyItems();
         return new ExperimentalContainer(this.user, this.containerId, this.type, this.title, this.position, itemsCopy, this.validBlockTags) {
             @Override
             public FullContainerName getFullContainerName(int slot) {
                 return ExperimentalContainer.this.getFullContainerName(slot);
             }
+
+            @Override
+            public int stackRequestSlot(final int bedrockSlot) {
+                return ExperimentalContainer.this.stackRequestSlot(bedrockSlot);
+            }
+
+            @Override
+            public int bedrockSlotFromStackRequest(final int requestSlot) {
+                return ExperimentalContainer.this.bedrockSlotFromStackRequest(requestSlot);
+            }
         };
+    }
+
+    private BedrockItem[] copyItems() {
+        final BedrockItem[] itemsCopy = new BedrockItem[this.items.length];
+        for (int i = 0; i < this.items.length; i++) {
+            itemsCopy[i] = this.items[i] != null ? this.items[i].copy() : BedrockItem.empty();
+        }
+        return itemsCopy;
     }
 
     public short translateContainerData(int containerData) {
         ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "translateContainerData not implemented for container type: " + this.type);
         return -1;
+    }
+
+    public int translateContainerDataValue(final int containerData, final int value) {
+        return value;
     }
 }

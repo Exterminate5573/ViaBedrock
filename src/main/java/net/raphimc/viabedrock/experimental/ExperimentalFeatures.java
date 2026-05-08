@@ -17,6 +17,7 @@
  */
 package net.raphimc.viabedrock.experimental;
 
+import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.connection.UserConnection;
@@ -402,7 +403,99 @@ public class ExperimentalFeatures {
                 wrapper.cancel();
                 return;
             }
-            ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+            final InventoryRequestTracker inventoryRequestTracker = wrapper.user().get(InventoryRequestTracker.class);
+            final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
+            final CreativeSlot creativeSlot = creativeSlot(inventoryTracker, slot);
+            if (item.isEmpty()) {
+                if (creativeSlot == null) {
+                    ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                    return;
+                }
+
+                final BedrockItem existingItem = creativeSlot.container().getItem(creativeSlot.bedrockSlot());
+                if (existingItem.isEmpty()) {
+                    return;
+                }
+
+                final ExperimentalContainer prevContainer = creativeSlot.container().copy();
+                final int requestId = inventoryRequestTracker.nextRequestId();
+                final ItemStackRequestInfo request = new ItemStackRequestInfo(
+                        requestId,
+                        List.of(new ItemStackRequestAction.DestroyAction(
+                                existingItem.amount(),
+                                creativeSlot.container().stackRequestSlotInfo(
+                                        creativeSlot.bedrockSlot(),
+                                        existingItem.netId() != null ? existingItem.netId() : 0
+                                )
+                        )),
+                        List.of(),
+                        TextProcessingEventOrigin.unknown
+                );
+
+                creativeSlot.container().setItem(creativeSlot.bedrockSlot(), BedrockItem.empty());
+                inventoryRequestTracker.addRequest(new InventoryRequestStorage(
+                        request,
+                        0,
+                        inventoryTracker.getHudContainer().copy(),
+                        List.of(prevContainer)
+                ));
+                ExperimentalPacketFactory.sendBedrockInventoryRequest(wrapper.user(), new ItemStackRequestInfo[]{request});
+                return;
+            }
+
+            final BedrockItem bedrockItem = itemRewriter.bedrockItem(item);
+            final CreativeContentStorage creativeContentStorage = wrapper.user().get(CreativeContentStorage.class);
+            final Integer creativeNetworkId = creativeContentStorage.creativeNetworkId(bedrockItem);
+            if (bedrockItem.isEmpty() || creativeNetworkId == null) {
+                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                return;
+            }
+            if (creativeContentStorage.creativeItem(creativeNetworkId).isEmpty()) {
+                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                return;
+            }
+
+            final int requestId = inventoryRequestTracker.nextRequestId();
+            final List<ItemStackRequestAction> actions = new ArrayList<>();
+            actions.add(new ItemStackRequestAction.CraftCreativeAction(creativeNetworkId, 1));
+            actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(bedrockItem), 1));
+
+            final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+            if (creativeSlot != null) {
+                final BedrockItem existingItem = creativeSlot.container().getItem(creativeSlot.bedrockSlot());
+                prevContainers.add(creativeSlot.container().copy());
+                if (!existingItem.isEmpty()) {
+                    actions.add(new ItemStackRequestAction.DestroyAction(
+                            existingItem.amount(),
+                            creativeSlot.container().stackRequestSlotInfo(
+                                    creativeSlot.bedrockSlot(),
+                                    existingItem.netId() != null ? existingItem.netId() : 0
+                            )
+                    ));
+                }
+                actions.add(new ItemStackRequestAction.TakeAction(
+                        bedrockItem.amount(),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
+                        creativeSlot.container().stackRequestSlotInfo(
+                                creativeSlot.bedrockSlot(),
+                                existingItem.netId() != null ? existingItem.netId() : 0
+                        )
+                ));
+                creativeSlot.container().setItem(creativeSlot.bedrockSlot(), bedrockItem);
+            } else if (slot == -1) {
+                actions.add(new ItemStackRequestAction.DropAction(
+                        bedrockItem.amount(),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
+                        false
+                ));
+            } else {
+                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                return;
+            }
+
+            final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+            inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, 0, inventoryTracker.getHudContainer().copy(), prevContainers));
+            ExperimentalPacketFactory.sendBedrockInventoryRequest(wrapper.user(), new ItemStackRequestInfo[]{request});
         }, true);
         protocol.registerServerbound(ServerboundPackets26_1.CONTAINER_CLOSE, ServerboundBedrockPackets.CONTAINER_CLOSE, new PacketHandlers() {
             @Override
@@ -500,24 +593,34 @@ public class ExperimentalFeatures {
             final BlockPosition position = wrapper.read(BedrockTypes.BLOCK_POSITION); // position
             wrapper.read(BedrockTypes.VAR_LONG); // entity unique id
 
-            if (inventoryTracker.isContainerOpen() || wrapper.user().get(InventoryTracker.class).isAnyScreenOpen()) {
+            if (inventoryTracker.isContainerOpen()) {
                 ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another container is open");
+                inventoryTracker.prepareForServerContainerOpen();
+            }
+            final InventoryTracker legacyInventoryTracker = wrapper.user().get(InventoryTracker.class);
+            if (legacyInventoryTracker.isContainerOpen()) {
+                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another container is open");
+                legacyInventoryTracker.prepareForServerContainerOpen();
+            }
+            if (legacyInventoryTracker.getCurrentForm() != null) {
+                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Server tried to open container while another screen is open");
                 PacketFactory.sendBedrockContainerClose(wrapper.user(), (byte) -1, ContainerType.NONE);
                 wrapper.cancel();
                 return;
             }
             final BedrockBlockEntity blockEntity = chunkTracker.getBlockEntity(position);
-            TextComponent title = new TranslationComponent("container." + blockStateRewriter.tag(chunkTracker.getBlockState(position)));
-            if (blockEntity != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
-                title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
-            }
-
             int size = 27;
             if (blockEntity != null && blockEntity.tag() != null
                     && blockEntity.tag().contains("id") && blockEntity.tag().getString("id").equals("Chest")
                     && blockEntity.tag().contains("pairlead")) {
                 // Double chest
                 size = 54;
+            }
+
+            final String blockTag = blockStateRewriter.tag(chunkTracker.getBlockState(position));
+            TextComponent title = new TranslationComponent(javaContainerTitleKey(type, blockTag, size));
+            if (blockEntity != null && blockEntity.tag() != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
+                title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
             }
 
             final ExperimentalContainer container;
@@ -538,6 +641,8 @@ public class ExperimentalFeatures {
                 case ANVIL -> container = new AnvilContainer(wrapper.user(), containerId, title, position);
                 case SMITHING_TABLE -> container = new SmithingContainer(wrapper.user(), containerId, title, position);
                 case STONECUTTER -> container = new StonecutterContainer(wrapper.user(), containerId, title, position);
+                case LOOM -> container = new LoomContainer(wrapper.user(), containerId, title, position);
+                case CARTOGRAPHY -> container = new CartographyContainer(wrapper.user(), containerId, title, position);
                 case DISPENSER, DROPPER -> container = new Generic3x3Container(wrapper.user(), containerId, type, title, position);
                 case WORKBENCH -> container = new CraftingTableContainer(wrapper.user(), containerId, title, position);
                 case GRINDSTONE -> container = new GrindstoneContainer(wrapper.user(), containerId, title, position);
@@ -564,8 +669,7 @@ public class ExperimentalFeatures {
             if (blockEntity != null && blockEntity.tag() != null
                     && blockEntity.tag().contains("id") && blockEntity.tag().getString("id").equals("Chest")
                     && blockEntity.tag().contains("pairlead")) {
-                //TODO: Temporary fix
-                wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaMenuId("minecraft:generic_9x6"));
+                wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaMenuId("minecraft:generic_9x6")); // type
             } else {
                 wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getBedrockToJavaContainers().get(type)); // type
             }
@@ -764,6 +868,27 @@ public class ExperimentalFeatures {
 
             // TODO: Clear recipes
         });
+        protocol.registerClientbound(ClientboundBedrockPackets.CREATIVE_CONTENT, null, wrapper -> {
+            wrapper.cancel();
+            final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
+            final CreativeContentStorage creativeContentStorage = wrapper.user().get(CreativeContentStorage.class);
+            creativeContentStorage.clear();
+
+            final int groupCount = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
+            for (int i = 0; i < groupCount; i++) {
+                wrapper.read(BedrockTypes.INT_LE); // category
+                wrapper.read(BedrockTypes.STRING); // name
+                wrapper.read(itemRewriter.itemInstanceType()); // icon
+            }
+
+            final int itemCount = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
+            for (int i = 0; i < itemCount; i++) {
+                final int creativeNetworkId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
+                final BedrockItem creativeItem = wrapper.read(itemRewriter.itemInstanceType());
+                wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // group index
+                creativeContentStorage.addCreativeItem(creativeNetworkId, creativeItem);
+            }
+        });
         protocol.registerClientbound(ClientboundBedrockPackets.ITEM_STACK_RESPONSE, null, wrapper -> {
             wrapper.cancel();
             ExperimentalInventoryTracker inventoryTracker = wrapper.user().get(ExperimentalInventoryTracker.class);
@@ -782,41 +907,58 @@ public class ExperimentalFeatures {
 
                 if (info.result() != ItemStackNetResult.Success) {
                     ViaBedrock.getPlatform().getLogger().warning("Received unsuccessful item stack response: " + info.result());
-                    inventoryTracker.getHudContainer().setItems(requestInfo.prevCursorContainer().getItems().clone());
-                    for (ExperimentalContainer container : requestInfo.prevContainers()) {
-                        ExperimentalContainer newContainer = inventoryTracker.getContainerClientbound(container.containerId(), null, null);
-                        if (newContainer == null) continue;
-                        newContainer.setItems(container.getItems().clone());
-                        ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), newContainer);  // Resync the container content on Java side
-                    }
+                    restoreFailedInventoryRequest(wrapper.user(), inventoryTracker, requestInfo);
                     continue;
                 }
 
                 //TODO: This is required for crafting so that the cursor item net id is updated properly
                 //TODO: Check that the items match the request, if not resync the container (We probably should do this anyway to be safe)
                 List<ExperimentalContainer> mismatchedContainers = new ArrayList<>();
+                boolean unrecoverableMismatch = false;
                 for (ItemStackResponseContainerInfo containerInfo : info.containers()) {
                     for (ItemStackResponseSlotInfo slotInfo : containerInfo.slots()) {
-                        ExperimentalContainer container = inventoryTracker.getContainerFromName(containerInfo.containerName(), slotInfo.slot());
+                        final int requestSlot = Byte.toUnsignedInt(slotInfo.requestedSlot());
+                        ExperimentalContainer container = inventoryTracker.getContainerFromName(containerInfo.containerName(), requestSlot);
                         if (container == null) {
                             ViaBedrock.getPlatform().getLogger().warning("Received item stack response for unknown container: " + containerInfo.containerName());
                             continue;
                         }
+                        final int bedrockSlot = container.bedrockSlotFromStackRequest(requestSlot);
 
                         // Check if the item matches the expected item
-                        BedrockItem expectedItem = container.getItem(slotInfo.slot());
-                        if (expectedItem.isEmpty()) continue; //TODO
-                        if (expectedItem.netId() == null || expectedItem.netId() != slotInfo.itemNetId() || expectedItem.amount() != slotInfo.amount()) {
-                            BedrockItem newItem = expectedItem.copy();
-                            newItem.setNetId(slotInfo.itemNetId());
-                            newItem.setAmount(slotInfo.amount());
-                            container.setItem(slotInfo.slot(), newItem);
-                            if (container.getFullContainerName(slotInfo.slot()).name() != ContainerEnumName.CursorContainer) {
+                        BedrockItem expectedItem = container.getItem(bedrockSlot);
+                        if (expectedItem.isEmpty()) {
+                            if (slotInfo.amount() != 0 || slotInfo.itemNetId() != 0) {
+                                unrecoverableMismatch = true;
+                                break;
+                            }
+                            continue;
+                        }
+                        if (slotInfo.amount() == 0) {
+                            container.setItem(bedrockSlot, BedrockItem.empty());
+                            if (container.getFullContainerName(bedrockSlot).name() != ContainerEnumName.CursorContainer) {
+                                mismatchedContainers.add(container);
+                            }
+                            continue;
+                        }
+                        final BedrockItem newItem = expectedItem.copy();
+                        applyItemStackResponse(newItem, slotInfo);
+                        if (!newItem.equals(expectedItem)) {
+                            final boolean itemContentChanged = !sameItemIgnoringNetId(newItem, expectedItem);
+                            container.setItem(bedrockSlot, newItem);
+                            if (itemContentChanged && container.getFullContainerName(bedrockSlot).name() != ContainerEnumName.CursorContainer) {
                                 mismatchedContainers.add(container);
                             }
                         }
-                        // TODO:  Handle custom name and durability
                     }
+                    if (unrecoverableMismatch) {
+                        break;
+                    }
+                }
+
+                if (unrecoverableMismatch) {
+                    restoreFailedInventoryRequest(wrapper.user(), inventoryTracker, requestInfo);
+                    continue;
                 }
 
                 for (ExperimentalContainer container : mismatchedContainers) {
@@ -849,14 +991,26 @@ public class ExperimentalFeatures {
 
             short javaId = container.translateContainerData(id);
             if (javaId == -1) {
+                if (container instanceof BrewingStandContainer && id == 2) {
+                    wrapper.cancel();
+                    return;
+                }
+                if (container instanceof FurnaceContainer && id == 3) {
+                    wrapper.cancel();
+                    return;
+                }
                 ViaBedrock.getPlatform().getLogger().warning("Received ContainerSetData packet with unknown id: containerId=" + containerId + ", id=" + id + ", value=" + value);
                 wrapper.cancel();
                 return;
             }
 
+            if (container instanceof FurnaceContainer && id == 0) {
+                ExperimentalPacketFactory.sendJavaContainerProperties(wrapper.user(), container, (short) 3, (short) 200);
+            }
+
             wrapper.write(Types.VAR_INT, windowId);
             wrapper.write(Types.SHORT, javaId);
-            wrapper.write(Types.SHORT, (short) value);
+            wrapper.write(Types.SHORT, (short) container.translateContainerDataValue(id, value));
         });
         protocol.registerClientbound(ClientboundBedrockPackets.PLAYER_ENCHANT_OPTIONS, null, wrapper -> {
             wrapper.cancel();
@@ -873,18 +1027,15 @@ public class ExperimentalFeatures {
                 final int cost = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // cost
                 wrapper.read(BedrockTypes.INT_LE); // slot
 
-                // TODO: How does bedrock decide on what to show
-                Enchant_Type selected = null;
-                int level = -1;
+                final List<EnchantData.Enchantment> enchantments = new ArrayList<>();
 
                 final int l1 = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // size
                 for (int j = 0; j < l1; j++) {
                     final byte id = wrapper.read(Types.BYTE); // enchant id
                     final byte lvl = wrapper.read(Types.BYTE); // enchant level
-
-                    if (selected == null) {
-                        selected = Enchant_Type.getByValue(id);
-                        level = lvl;
+                    final Enchant_Type enchantment = Enchant_Type.getByValue(Byte.toUnsignedInt(id));
+                    if (enchantment != null && Byte.toUnsignedInt(lvl) > 0) {
+                        enchantments.add(new EnchantData.Enchantment(enchantment, Byte.toUnsignedInt(lvl)));
                     }
                 }
 
@@ -892,10 +1043,9 @@ public class ExperimentalFeatures {
                 for (int j = 0; j < l2; j++) {
                     final byte id = wrapper.read(Types.BYTE); // enchant id
                     final byte lvl = wrapper.read(Types.BYTE); // enchant level
-
-                    if (selected == null) {
-                        selected = Enchant_Type.getByValue(id);
-                        level = lvl;
+                    final Enchant_Type enchantment = Enchant_Type.getByValue(Byte.toUnsignedInt(id));
+                    if (enchantment != null && Byte.toUnsignedInt(lvl) > 0) {
+                        enchantments.add(new EnchantData.Enchantment(enchantment, Byte.toUnsignedInt(lvl)));
                     }
                 }
 
@@ -903,17 +1053,16 @@ public class ExperimentalFeatures {
                 for (int j = 0; j < l3; j++) {
                     final byte id = wrapper.read(Types.BYTE); // enchant id
                     final byte lvl = wrapper.read(Types.BYTE); // enchant level
-
-                    if (selected == null) {
-                        selected = Enchant_Type.getByValue(id);
-                        level = lvl;
+                    final Enchant_Type enchantment = Enchant_Type.getByValue(Byte.toUnsignedInt(id));
+                    if (enchantment != null && Byte.toUnsignedInt(lvl) > 0) {
+                        enchantments.add(new EnchantData.Enchantment(enchantment, Byte.toUnsignedInt(lvl)));
                     }
                 }
 
                 wrapper.read(BedrockTypes.STRING); // Name
                 final int netId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT); // Enchant Net Id
 
-                data.add(new EnchantData(cost, selected, level, netId));
+                data.add(new EnchantData(cost, enchantments, netId));
             }
 
             enchantmentContainer.setEnchantData(data);
@@ -1159,6 +1308,7 @@ public class ExperimentalFeatures {
         user.put(new InventoryTransactionRewriter(user));
         user.put(new InventoryRequestTracker(user));
         user.put(new CraftingDataTracker(user));
+        user.put(new CreativeContentStorage(user));
         user.put(new MapTracker(user));
     }
 
@@ -1178,6 +1328,126 @@ public class ExperimentalFeatures {
             ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer()); // Java client always resets inventory on respawn. Resend it
         }
         inventoryTracker.getInventoryContainer().sendSelectedHotbarSlotToClient(); // Java client always resets selected hotbar slot on respawn. Resend it
+    }
+
+    private static CreativeSlot creativeSlot(final ExperimentalInventoryTracker inventoryTracker, final short javaSlot) {
+        if (javaSlot >= 1 && javaSlot <= 4) {
+            return new CreativeSlot(inventoryTracker.getHudContainer(), inventoryTracker.getHudContainer().bedrockSlot(javaSlot));
+        }
+        if (javaSlot >= 5 && javaSlot <= 8) {
+            return new CreativeSlot(inventoryTracker.getArmorContainer(), inventoryTracker.getArmorContainer().bedrockSlot(javaSlot));
+        }
+        if (javaSlot >= 9 && javaSlot <= 44) {
+            return new CreativeSlot(inventoryTracker.getInventoryContainer(), inventoryTracker.getInventoryContainer().bedrockSlot(javaSlot));
+        }
+        if (javaSlot == 45) {
+            return new CreativeSlot(inventoryTracker.getOffhandContainer(), inventoryTracker.getOffhandContainer().bedrockSlot(javaSlot));
+        }
+        return null;
+    }
+
+    private static void restoreFailedInventoryRequest(final UserConnection user, final ExperimentalInventoryTracker inventoryTracker, final InventoryRequestStorage requestInfo) {
+        inventoryTracker.getHudContainer().setItems(requestInfo.prevCursorContainer().getItems().clone());
+
+        final List<ExperimentalContainer> restoredContainers = new ArrayList<>();
+        for (ExperimentalContainer previousContainer : requestInfo.prevContainers()) {
+            final ExperimentalContainer container = inventoryTracker.getContainerClientbound(previousContainer.containerId(), null, null);
+            if (container == null) {
+                continue;
+            }
+
+            container.setItems(previousContainer.getItems().clone());
+            restoredContainers.add(container);
+        }
+
+        final List<Byte> resyncedJavaContainers = new ArrayList<>();
+        for (ExperimentalContainer container : restoredContainers) {
+            if (resyncedJavaContainers.contains(container.javaContainerId())) {
+                continue;
+            }
+
+            resyncedJavaContainers.add(container.javaContainerId());
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, container);
+        }
+    }
+
+    private static void applyItemStackResponse(final BedrockItem item, final ItemStackResponseSlotInfo slotInfo) {
+        item.setNetId(slotInfo.itemNetId());
+        item.setAmount(Byte.toUnsignedInt(slotInfo.amount()));
+        if (slotInfo.durability() != 0) {
+            itemTag(item).putInt("Damage", slotInfo.durability());
+        }
+
+        final String customName = !slotInfo.customName().isEmpty() ? slotInfo.customName() : slotInfo.filteredCustomName();
+        if (!customName.isEmpty()) {
+            final CompoundTag tag = itemTag(item);
+            final CompoundTag displayTag;
+            if (tag.get("display") instanceof CompoundTag existingDisplayTag) {
+                displayTag = existingDisplayTag;
+            } else {
+                displayTag = new CompoundTag();
+                tag.put("display", displayTag);
+            }
+            displayTag.putString("Name", customName);
+        }
+    }
+
+    private static boolean sameItemIgnoringNetId(final BedrockItem first, final BedrockItem second) {
+        final BedrockItem firstCopy = first.copy();
+        final BedrockItem secondCopy = second.copy();
+        firstCopy.setNetId(null);
+        secondCopy.setNetId(null);
+        return firstCopy.equals(secondCopy);
+    }
+
+    private static CompoundTag itemTag(final BedrockItem item) {
+        if (item.tag() == null) {
+            item.setTag(new CompoundTag());
+        }
+        return item.tag();
+    }
+
+    private record CreativeSlot(ExperimentalContainer container, int bedrockSlot) {
+    }
+
+    private static String javaContainerTitleKey(final ContainerType type, final String blockTag, final int size) {
+        return switch (type) {
+            case ANVIL -> "container.repair";
+            case BEACON -> "container.beacon";
+            case BLAST_FURNACE -> "container.blast_furnace";
+            case BREWING_STAND -> "container.brewing";
+            case CARTOGRAPHY -> "container.cartography_table";
+            case CONTAINER -> {
+                if (size == 54) {
+                    yield "container.chestDouble";
+                }
+                if ("barrel".equals(blockTag)) {
+                    yield "container.barrel";
+                }
+                if ("ender_chest".equals(blockTag)) {
+                    yield "container.enderchest";
+                }
+                if (blockTag != null && blockTag.contains("shulker_box")) {
+                    yield "container.shulkerBox";
+                }
+                yield "container.chest";
+            }
+            case CRAFTER -> "container.crafter";
+            case DISPENSER -> "container.dispenser";
+            case DROPPER -> "container.dropper";
+            case ENCHANTMENT -> "container.enchant";
+            case FURNACE -> "container.furnace";
+            case GRINDSTONE -> "container.grindstone_title";
+            case HOPPER, MINECART_HOPPER -> "container.hopper";
+            case LOOM -> "container.loom";
+            case MINECART_CHEST, CHEST_BOAT -> "container.chest";
+            case SMITHING_TABLE -> "container.upgrade";
+            case SMOKER -> "container.smoker";
+            case STONECUTTER -> "container.stonecutter";
+            case WORKBENCH -> "container.crafting";
+            case ARMOR, CAULDRON, COMMAND_BLOCK, COMPOUND_CREATOR, DECORATED_POT, ELEMENT_CONSTRUCTOR, HAND, HORSE, HUD, INVENTORY, JIGSAW_EDITOR,
+                 JUKEBOX, LAB_TABLE, LECTERN, MATERIAL_REDUCER, NONE, STRUCTURE_EDITOR, TRADE -> "container.chest";
+        };
     }
 
 }

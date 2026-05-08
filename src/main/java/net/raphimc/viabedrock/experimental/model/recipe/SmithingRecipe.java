@@ -45,8 +45,8 @@ public class SmithingRecipe extends Recipe {
         template.writeJavaIngredientData(packet, user);
         baseIngredient.writeJavaIngredientData(packet, user);
         additionIngredient.writeJavaIngredientData(packet, user);
-        new ItemDescriptor.DefaultDescriptor(result.identifier(), result.auxValue()).writeJavaIngredientData(packet, user);
-        new ItemDescriptor.InvalidDescriptor().writeJavaIngredientData(packet, user); //TODO: Crafting Station
+        ItemDescriptor.writeJavaItemStackData(packet, user, result);
+        ItemDescriptor.writeJavaItemNameData(packet, user, "minecraft:smithing_table");
     }
 
     @Override

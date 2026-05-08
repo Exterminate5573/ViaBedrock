@@ -100,18 +100,22 @@ public class InventoryTracker extends StoredObject {
     }
 
     public void markPendingClose(final Container container) {
-        if (this.pendingCloseContainer != null) {
-            throw new IllegalStateException("There is already another container pending close");
+        if (container == null) {
+            return;
         }
-        if (this.currentContainer == container) {
+        if (this.currentContainer != null && this.currentContainer.javaContainerId() == container.javaContainerId()) {
             this.currentContainer = null;
+        }
+        if (this.pendingCloseContainer != null) {
+            return;
         }
         this.pendingCloseContainer = container;
     }
 
     public void setCurrentContainerClosed(final boolean serverInitiated) {
-        if (serverInitiated) {
-            PacketFactory.sendBedrockContainerClose(this.user(), this.currentContainer.containerId(), ContainerType.NONE);
+        final Container closingContainer = this.currentContainer != null ? this.currentContainer : this.pendingCloseContainer;
+        if (serverInitiated && closingContainer != null) {
+            PacketFactory.sendBedrockContainerClose(this.user(), closingContainer.containerId(), ContainerType.NONE);
         }
         this.currentContainer = null;
         this.pendingCloseContainer = null;
@@ -183,9 +187,10 @@ public class InventoryTracker extends StoredObject {
     }
 
     public void setCurrentContainer(final Container container) {
-        if (this.isContainerOpen()) {
+        if (this.currentContainer != null) {
             throw new IllegalStateException("There is already another container open");
         }
+        this.pendingCloseContainer = null;
         this.currentContainer = container;
     }
 
@@ -201,10 +206,23 @@ public class InventoryTracker extends StoredObject {
         this.currentForm = currentForm;
     }
 
+    public void prepareForServerContainerOpen() {
+        if (this.currentContainer != null) {
+            PacketFactory.sendJavaContainerClose(this.user(), this.currentContainer.javaContainerId());
+        }
+        this.currentContainer = null;
+        this.pendingCloseContainer = null;
+    }
+
     private void forceCloseCurrentContainer() {
-        this.markPendingClose(this.currentContainer);
-        PacketFactory.sendJavaContainerClose(this.user(), this.pendingCloseContainer.javaContainerId());
-        PacketFactory.sendBedrockContainerClose(this.user(), this.pendingCloseContainer.containerId(), ContainerType.NONE);
+        final Container closingContainer = this.currentContainer;
+        if (closingContainer == null) {
+            return;
+        }
+        this.currentContainer = null;
+        this.pendingCloseContainer = closingContainer;
+        PacketFactory.sendJavaContainerClose(this.user(), closingContainer.javaContainerId());
+        PacketFactory.sendBedrockContainerClose(this.user(), closingContainer.containerId(), ContainerType.NONE);
     }
 
 }

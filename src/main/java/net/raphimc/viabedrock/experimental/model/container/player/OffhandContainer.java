@@ -53,13 +53,23 @@ public class OffhandContainer extends InventorySubContainer {
     }
 
     @Override
+    public int stackRequestSlot(final int bedrockSlot) {
+        return 1;
+    }
+
+    @Override
+    public int bedrockSlotFromStackRequest(final int requestSlot) {
+        return 0;
+    }
+
+    @Override
     protected void onSlotChanged(final int slot, final BedrockItem oldItem, final BedrockItem newItem) {
         super.onSlotChanged(slot, oldItem, newItem);
         if (slot == 0) {
             final PacketWrapper mobEquipment = PacketWrapper.create(ServerboundBedrockPackets.MOB_EQUIPMENT, this.user);
             mobEquipment.write(BedrockTypes.UNSIGNED_VAR_LONG, this.user.get(EntityTracker.class).getClientPlayer().runtimeId()); // entity runtime id
             mobEquipment.write(this.user.get(ItemRewriter.class).itemType(), newItem); // item
-            mobEquipment.write(Types.BYTE, (byte) 1); // slot
+            mobEquipment.write(Types.BYTE, (byte) 0); // slot
             mobEquipment.write(Types.BYTE, (byte) 0); // selected slot
             mobEquipment.write(Types.BYTE, this.containerId); // container id
             mobEquipment.sendToServer(BedrockProtocol.class);

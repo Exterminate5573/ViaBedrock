@@ -24,6 +24,7 @@ import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class BrewingStandContainer extends ExperimentalContainer {
@@ -35,9 +36,9 @@ public class BrewingStandContainer extends ExperimentalContainer {
     @Override
     public FullContainerName getFullContainerName(int slot) {
         return switch (slot) {
-            case 0 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
+            case 0 -> new FullContainerName(ContainerEnumName.BrewingStandInputContainer, null);
             case 1, 2, 3 -> new FullContainerName(ContainerEnumName.BrewingStandResultContainer, null);
-            case 4 -> new FullContainerName(ContainerEnumName.BrewingStandInputContainer, null);
+            case 4 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
             default -> throw new IllegalArgumentException("Invalid slot for Brewing Container: " + slot);
         };
     }
@@ -67,7 +68,38 @@ public class BrewingStandContainer extends ExperimentalContainer {
         return switch (containerData) {
             case 0 -> 0; // Progress arrow
             case 1 -> 1; // Fuel progress
+            case 2 -> -1; // Fuel total, Java has a fixed max of 20
             default -> -1; // Unknown
+        };
+    }
+
+    @Override
+    public int translateContainerDataValue(final int containerData, final int value) {
+        return switch (containerData) {
+            case 0 -> Math.max(0, Math.min(400, value));
+            case 1 -> Math.max(0, Math.min(20, value));
+            default -> value;
+        };
+    }
+
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot >= 1 && bedrockSlot <= 3) {
+            return 1;
+        }
+        return super.maxStackSizeForSlot(bedrockSlot, item);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 0 -> !this.isItem(item, "minecraft:blaze_powder") && !this.isBrewingBottle(item);
+            case 1, 2, 3 -> this.isBrewingBottle(item);
+            case 4 -> this.isItem(item, "minecraft:blaze_powder");
+            default -> false;
         };
     }
 }

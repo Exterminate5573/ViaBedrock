@@ -54,6 +54,15 @@ public class HudContainer extends InventoryRedirectContainer {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            return false;
+        }
+
+        return super.setItems(items);
+    }
+
+    @Override
     public int javaSlot(final int slot) {
         if (slot >= 28 && slot <= 31) {
             return slot - 27;

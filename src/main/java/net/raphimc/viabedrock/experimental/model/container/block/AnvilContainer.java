@@ -17,12 +17,15 @@
  */
 package net.raphimc.viabedrock.experimental.model.container.block;
 
+import com.viaversion.nbt.tag.CompoundTag;
+import com.viaversion.nbt.tag.NumberTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
+import net.raphimc.viabedrock.experimental.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
@@ -100,79 +103,205 @@ public class AnvilContainer extends ExperimentalContainer {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
+            return false;
+        }
+
+        return super.setItems(items);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        return bedrockSlot != 50;
+    }
+
+    @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 2) {
             if (!ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
                 return false;
             }
-            //TODO: This is experimental code...
-            ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
-            InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-
-            int requestId = inventoryRequestTracker.nextRequestId();
-
-            List<ExperimentalContainer> prevContainers = new ArrayList<>();
-            prevContainers.add(this.copy());
-            prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-            ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
-
-            BedrockItem resultItem = this.getItem(1);
-
-            List<ItemStackRequestAction> actions = new ArrayList<>();
-            actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)); //TODO: This needs more debugging
-
-            // TODO: Recipe Check
-            if (!this.getItem(2).isEmpty()) {
-                actions.add(new ItemStackRequestAction.ConsumeAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
-                        new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
-                        (byte) 2,
-                        this.getItem(2).netId()
-                )));
+            if (action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE && action != ContainerInput.SWAP) {
+                return false;
             }
 
-            actions.add(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                    new FullContainerName(ContainerEnumName.AnvilInputContainer, null),
-                    (byte) 1,
-                    this.getItem(1).netId()
-            )));
-            actions.add(new ItemStackRequestAction.PlaceAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
-                    new FullContainerName(ContainerEnumName.CreatedOutputContainer, null),
-                    (byte) 50,
-                    requestId
-            ), new ItemStackRequestSlotInfo( // TODO: Shift click
-                    new FullContainerName(ContainerEnumName.CursorContainer, null),
-                    (byte) 0,
-                    0 // Will be filled by the server
-            )));
+            final ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
+            final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+            final InventoryContainer inventory = inventoryTracker.getInventoryContainer();
+            final BedrockItem inputItem = this.getItem(1);
+            final BedrockItem materialItem = this.getItem(2);
+            final BedrockItem resultItem = this.getItem(50);
+            if (inputItem.isEmpty() || resultItem.isEmpty()) {
+                return false;
+            }
 
-            List<String> filterStrings = new ArrayList<>();
+            final BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
+            if (action == ContainerInput.PICKUP && !cursorItem.isEmpty() && (cursorItem.isDifferent(resultItem) || cursorItem.amount() + resultItem.amount() > this.maxStackSize(resultItem))) {
+                return false;
+            }
+            if (action == ContainerInput.QUICK_MOVE && this.inventoryCapacity(inventory, resultItem) < resultItem.amount()) {
+                return false;
+            }
+            final SwapDestination swapDestination = action == ContainerInput.SWAP ? this.resultSwapDestination(button, resultItem) : null;
+            if (action == ContainerInput.SWAP && swapDestination == null) {
+                return false;
+            }
+
+            final int requestId = inventoryRequestTracker.nextRequestId();
+            final int materialConsumeCount = this.materialConsumeCount(inputItem, materialItem, resultItem);
+            final List<String> filterStrings = new ArrayList<>();
             TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
             if (!this.getRenameText().isEmpty()) {
                 filterStrings.add(this.getRenameText());
                 origin = TextProcessingEventOrigin.AnvilText;
-
-                //TODO: Set the renamed item name
-                //resultItem.
             }
 
-            ItemStackRequestInfo request = new ItemStackRequestInfo(
-                    requestId,
-                    actions,
-                    filterStrings,
-                    origin
-            );
+            final List<ItemStackRequestAction> actions = new ArrayList<>();
+            actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, filterStrings.isEmpty() ? -1 : 0));
+            if (materialConsumeCount > 0) {
+                actions.add(new ItemStackRequestAction.ConsumeAction(materialConsumeCount, this.stackRequestSlotInfo(2, materialItem.netId() != null ? materialItem.netId() : 0)));
+            }
+            actions.add(new ItemStackRequestAction.ConsumeAction(1, this.stackRequestSlotInfo(1, inputItem.netId() != null ? inputItem.netId() : 0)));
 
-            this.setItem(1, BedrockItem.empty()); // Clear the input item
-            this.setItem(2, BedrockItem.empty()); // Clear the material item (TODO: May need an algo)
-            inventoryTracker.getHudContainer().setItem(0, resultItem);
+            if (action == ContainerInput.PICKUP) {
+                actions.add(new ItemStackRequestAction.TakeAction(
+                        resultItem.amount(),
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
+                        ItemStackRequestSlotInfo.cursor(cursorItem.netId() != null ? cursorItem.netId() : 0)
+                ));
+            } else if (action == ContainerInput.QUICK_MOVE) {
+                this.addOutputToInventoryActions(actions, inventory, resultItem, resultItem.amount(), requestId);
+            } else {
+                actions.add(this.takeCreatedOutputAction(resultItem, requestId, swapDestination));
+            }
 
-            inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
+            final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, filterStrings, origin);
+            final List<ExperimentalContainer> prevContainers = new ArrayList<>();
+            this.addPrevContainer(prevContainers, this);
+            this.addPrevContainer(prevContainers, inventory);
+            if (swapDestination != null) {
+                this.addPrevContainer(prevContainers, swapDestination.container());
+            }
+            inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, inventoryTracker.getHudContainer().copy(), prevContainers));
             ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
-        } else {
-            return false;
+
+            this.setItem(1, this.itemAfterRemovingAmount(inputItem, 1));
+            this.setItem(2, this.itemAfterRemovingAmount(materialItem, materialConsumeCount));
+            this.setItem(50, BedrockItem.empty());
+            if (action == ContainerInput.PICKUP) {
+                if (cursorItem.isEmpty()) {
+                    inventoryTracker.getHudContainer().setItem(0, resultItem.copy());
+                } else {
+                    final BedrockItem newCursorItem = cursorItem.copy();
+                    newCursorItem.setAmount(cursorItem.amount() + resultItem.amount());
+                    inventoryTracker.getHudContainer().setItem(0, newCursorItem);
+                }
+            } else if (action == ContainerInput.QUICK_MOVE) {
+                this.addToInventory(inventory, resultItem, resultItem.amount(), true, requestId);
+                ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventory);
+            } else {
+                swapDestination.container().setItem(swapDestination.bedrockSlot(), resultItem.copy());
+                ExperimentalPacketFactory.sendJavaContainerSetContent(user, swapDestination.container());
+            }
+            ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+            return true;
+        }
+        return super.handleClick(revision, javaSlot, button, action);
+    }
+
+    private int materialConsumeCount(final BedrockItem inputItem, final BedrockItem materialItem, final BedrockItem resultItem) {
+        if (materialItem.isEmpty() || this.isOnlyRenaming(inputItem, resultItem)) {
+            return 0;
         }
 
-        return super.handleClick(revision, javaSlot, button, action);
+        final int inputDamage = this.damageValue(inputItem);
+        final int resultDamage = this.damageValue(resultItem);
+        if (inputDamage > resultDamage && materialItem.identifier() != inputItem.identifier()) {
+            final int maxDamage = this.maxDamage(inputItem);
+            if (maxDamage > 0) {
+                final int repairPerItem = Math.max(1, maxDamage / 4);
+                final int repairedDamage = inputDamage - resultDamage;
+                return Math.min(materialItem.amount(), Math.max(1, (repairedDamage + repairPerItem - 1) / repairPerItem));
+            }
+        }
+
+        return 1;
+    }
+
+    private boolean isOnlyRenaming(final BedrockItem inputItem, final BedrockItem resultItem) {
+        final BedrockItem inputWithoutName = this.withoutCustomName(inputItem);
+        final BedrockItem resultWithoutName = this.withoutCustomName(resultItem);
+        inputWithoutName.setAmount(resultWithoutName.amount());
+        return !inputWithoutName.isDifferent(resultWithoutName);
+    }
+
+    private BedrockItem withoutCustomName(final BedrockItem item) {
+        final BedrockItem copy = item.copy();
+        if (copy.tag() == null) {
+            return copy;
+        }
+
+        final CompoundTag tag = copy.tag().copy();
+        if (tag.get("display") instanceof CompoundTag displayTag) {
+            displayTag.remove("Name");
+            if (displayTag.isEmpty()) {
+                tag.remove("display");
+            }
+        }
+        copy.setTag(tag.isEmpty() ? null : tag);
+        return copy;
+    }
+
+    private int damageValue(final BedrockItem item) {
+        if (item.tag() != null && item.tag().get("Damage") instanceof NumberTag damageTag) {
+            return damageTag.asInt();
+        }
+        return 0;
+    }
+
+    private void addOutputToInventoryActions(final List<ItemStackRequestAction> actions, final InventoryContainer inventory, final BedrockItem resultItem, final int totalAmount, final int requestId) {
+        int remaining = totalAmount;
+        for (boolean mergePass : new boolean[]{true, false}) {
+            for (int slot : this.inventorySlots(inventory, true)) {
+                if (remaining <= 0) {
+                    break;
+                }
+                final BedrockItem destinationItem = inventory.getItem(slot);
+                if (mergePass) {
+                    if (destinationItem.isEmpty() || destinationItem.isDifferent(resultItem) || destinationItem.amount() >= this.maxStackSize(resultItem)) {
+                        continue;
+                    }
+                } else if (!destinationItem.isEmpty()) {
+                    continue;
+                }
+
+                final int amountToMove = mergePass
+                        ? Math.min(remaining, this.maxStackSize(resultItem) - destinationItem.amount())
+                        : Math.min(remaining, this.maxStackSize(resultItem));
+                actions.add(new ItemStackRequestAction.TakeAction(
+                        amountToMove,
+                        ItemStackRequestSlotInfo.createdOutput(requestId),
+                        inventory.stackRequestSlotInfo(slot, destinationItem.netId() != null ? destinationItem.netId() : 0)
+                ));
+                remaining -= amountToMove;
+            }
+        }
+    }
+
+    @Override
+    protected int inventoryCapacity(final InventoryContainer inventory, final BedrockItem resultItem) {
+        int capacity = 0;
+        for (int slot = inventory.size() - 1; slot >= 0; slot--) {
+            final BedrockItem item = inventory.getItem(slot);
+            if (item.isEmpty()) {
+                capacity += this.maxStackSize(resultItem);
+            } else if (!item.isDifferent(resultItem)) {
+                capacity += this.maxStackSize(resultItem) - item.amount();
+            }
+        }
+        return capacity;
     }
 
     public String getRenameText() {

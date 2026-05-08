@@ -18,12 +18,11 @@
 package net.raphimc.viabedrock.experimental.model.container.block;
 
 import com.viaversion.nbt.tag.CompoundTag;
+import com.viaversion.nbt.tag.ListTag;
 import com.viaversion.nbt.tag.ShortTag;
-import com.viaversion.nbt.tag.Tag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
-import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.data.Enchantments1_20_5;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.util.RegistryUtil;
 import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
@@ -40,6 +39,7 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 
 import java.util.ArrayList;
@@ -95,15 +95,39 @@ public class EnchantmentContainer extends ExperimentalContainer {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.items.length) {
+            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
+            return false;
+        }
+
+        return super.setItems(items);
+    }
+
+    @Override
     public boolean handleButtonClick(final int button) {
         if (button < 0 || button > 2 || button >= this.data.size()) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received invalid enchantment option button click: " + button);
+            return false;
+        }
+        final EnchantData enchantData = this.data.get(button);
+        if (!enchantData.isValid()) {
             return false;
         }
 
         ExperimentalInventoryTracker inventoryTracker = user.get(ExperimentalInventoryTracker.class);
         InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
         EntityTracker entityTracker  = user.get(EntityTracker.class);
+        final BedrockItem inputItem = this.getItem(14);
+        final BedrockItem materialItem = this.getItem(15);
+        final boolean survivalLike = entityTracker.getClientPlayer().gameType() == GameType.Survival || entityTracker.getClientPlayer().gameType() == GameType.Adventure;
+        final int materialCost = button + 1;
+        if (inputItem.isEmpty()) {
+            return false;
+        }
+        if (survivalLike && (!this.isItem(materialItem, "minecraft:lapis_lazuli") || materialItem.amount() < materialCost)) {
+            return false;
+        }
 
         final List<ExperimentalContainer> prevContainers = new ArrayList<>();
         final ExperimentalContainer prevCursorContainer = inventoryTracker.getHudContainer().copy();
@@ -111,44 +135,26 @@ public class EnchantmentContainer extends ExperimentalContainer {
         prevContainers.add(this.copy());
 
         int reqId = inventoryRequestTracker.nextRequestId();
+        final BedrockItem resultItem = this.enchantedResult(inputItem, enchantData);
 
         List<ItemStackRequestAction> actions = new ArrayList<>();
 
-        ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(this.data.get(button).netId(), 1);
-        ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
-                this.getFullContainerName(14), (byte) 14, this.getItem(14).netId()
-        ));
+        ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(enchantData.netId(), 1);
+        ItemStackRequestAction craftResultsAction = new ItemStackRequestAction.CraftResultsDeprecatedAction(List.of(resultItem), 1);
+        ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, this.stackRequestSlotInfo(14, this.stackNetId(inputItem)));
         ItemStackRequestAction placeAction = new ItemStackRequestAction.PlaceAction(1,
-                new ItemStackRequestSlotInfo(
-                        new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, reqId
-                ),
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(14), (byte) 14, reqId
-                )
+                ItemStackRequestSlotInfo.createdOutput(reqId),
+                this.stackRequestSlotInfo(14, reqId)
         );
         actions.add(craftAction);
+        actions.add(craftResultsAction);
         actions.add(consumeAction);
         actions.add(placeAction);
 
-        if (entityTracker.getClientPlayer().gameType() == GameType.Survival || entityTracker.getClientPlayer().gameType() == GameType.Adventure) {
-            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(button + 1, new ItemStackRequestSlotInfo(
-                    this.getFullContainerName(15), (byte) 15, this.getItem(15).netId()
-            ));
+        if (survivalLike) {
+            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(materialCost, this.stackRequestSlotInfo(15, this.stackNetId(materialItem)));
             actions.add(consumeAction2);
-
-            this.setItem(15, this.itemAfterRemovingAmount(this.getItem(15), button + 1));
         }
-
-        /* FIXME
-        BedrockItem item = this.getItem(14).copy();
-        CompoundTag tag = item.tag() != null ? item.tag().copy() : new CompoundTag();
-        CompoundTag enchant = new CompoundTag();
-        enchant.put("id", new ShortTag((short) this.data.get(button).type().getValue()));
-        enchant.put("lvl", new ShortTag((short) this.data.get(button).level()));
-        tag.put("ench", enchant);
-        item.setTag(tag);
-        this.setItem(14, item);
-        */
 
         ItemStackRequestInfo request = new ItemStackRequestInfo(
                 reqId,
@@ -160,16 +166,57 @@ public class EnchantmentContainer extends ExperimentalContainer {
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, 0, prevCursorContainer, prevContainers)); // Store the request to track it later
         ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
 
+        this.setItem(14, resultItem);
+        if (survivalLike) {
+            this.setItem(15, this.itemAfterRemovingAmount(materialItem, materialCost));
+        }
+        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+
         return true;
+    }
+
+    private BedrockItem enchantedResult(final BedrockItem inputItem, final EnchantData enchantData) {
+        final BedrockItem resultItem = inputItem.copy();
+        resultItem.setAmount(1);
+
+        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
+        final String identifier = itemRewriter.getItems().inverse().get(resultItem.identifier());
+        if ("minecraft:book".equals(identifier)) {
+            final Integer enchantedBookId = itemRewriter.getItems().get("minecraft:enchanted_book");
+            if (enchantedBookId != null) {
+                resultItem.setIdentifier(enchantedBookId);
+            }
+        }
+
+        final CompoundTag tag = resultItem.tag() != null ? resultItem.tag().copy() : new CompoundTag();
+        ListTag<CompoundTag> enchantments = tag.getListTag("ench", CompoundTag.class);
+        if (enchantments == null) {
+            enchantments = new ListTag<>(CompoundTag.class);
+            tag.put("ench", enchantments);
+        }
+
+        for (EnchantData.Enchantment data : enchantData.enchantments()) {
+            final CompoundTag enchantment = new CompoundTag();
+            enchantment.put("id", new ShortTag((short) data.type().getValue()));
+            enchantment.put("lvl", new ShortTag((short) data.level()));
+            enchantments.add(enchantment);
+        }
+        resultItem.setTag(tag);
+        return resultItem;
     }
 
     public void setEnchantData(List<EnchantData> data) {
         this.data = data;
 
         // Send to java client
-        for (int i = 0; i < Math.min(this.data.size(), 3); i++) {
-            EnchantData d = this.data.get(i);
-            ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) d.cost());
+        for (int i = 0; i < 3; i++) {
+            final EnchantData d = i < this.data.size() ? this.data.get(i) : null;
+            ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) (d != null ? d.cost() : 0));
+            if (d == null || !d.isValid() || d.type() == null) {
+                ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 4), (short) -1);
+                ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) -1);
+                continue;
+            }
 
             String javaEnchant = BedrockProtocol.MAPPINGS.getBedrockToJavaEnchantments().get(d.type());
             // Update the java item with the enchantment
@@ -189,6 +236,26 @@ public class EnchantmentContainer extends ExperimentalContainer {
             ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) d.level());
         }
 
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        if (item.isEmpty()) {
+            return true;
+        }
+        return switch (bedrockSlot) {
+            case 14 -> !this.isItem(item, "minecraft:lapis_lazuli");
+            case 15 -> this.isItem(item, "minecraft:lapis_lazuli");
+            default -> false;
+        };
+    }
+
+    @Override
+    protected int maxStackSizeForSlot(final int bedrockSlot, final BedrockItem item) {
+        if (bedrockSlot == 14) {
+            return 1;
+        }
+        return super.maxStackSizeForSlot(bedrockSlot, item);
     }
 
 }
