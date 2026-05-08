@@ -156,8 +156,6 @@ public class BeaconContainer extends ExperimentalContainer {
         final int bedrockIdPrimary = bedrockIdentifierPrimary == null ? 0 : BedrockProtocol.MAPPINGS.getBedrockEffects().get(bedrockIdentifierPrimary);
         final int bedrockIdSecondary = bedrockIdentifierSecondary == null ? 0 : BedrockProtocol.MAPPINGS.getBedrockEffects().get(bedrockIdentifierSecondary);
 
-        final BedrockItem paymentItem = this.getItem(27);
-
         ItemStackRequestInfo requestInfo = new ItemStackRequestInfo(
                 inventoryRequestTracker.nextRequestId(),
                 List.of(
