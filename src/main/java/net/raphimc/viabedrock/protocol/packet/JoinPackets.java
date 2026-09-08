@@ -256,7 +256,9 @@ public class JoinPackets {
                     wrapper.read(BedrockTypes.INT_LE); // limited world height
                     wrapper.read(Types.BOOLEAN); // nether type
                     wrapper.read(BedrockTypes.EDUCATION_URI_RESOURCE); // education shared uri
-                    wrapper.read(Types.BOOLEAN); // enable experimental game play
+                    if (wrapper.read(Types.BOOLEAN)) { // optional experimental game play
+                        wrapper.read(Types.BOOLEAN); // enable experimental game play
+                    }
                     final ChatRestrictionLevel chatRestrictionLevel = ChatRestrictionLevel.getByValue(wrapper.read(Types.BYTE), ChatRestrictionLevel.Disabled); // chat restriction level
                     wrapper.read(Types.BOOLEAN); // disabling player interactions
                     wrapper.read(BedrockTypes.VAR_INT); // server editor connection policy
@@ -285,12 +287,22 @@ public class JoinPackets {
                         if (wrapper.read(Types.BOOLEAN)) { // has gathering join information
                             wrapper.read(BedrockTypes.UUID); // experience id
                             wrapper.read(BedrockTypes.STRING); // experience name
-                            wrapper.read(BedrockTypes.UUID); // experience world id
-                            wrapper.read(BedrockTypes.STRING); // experience world name
+                            if (wrapper.read(Types.BOOLEAN)) { // has experience world id
+                                wrapper.read(BedrockTypes.UUID); // experience world id
+                            }
+                            if (wrapper.read(Types.BOOLEAN)) { // has experience world name
+                                wrapper.read(BedrockTypes.STRING); // experience world name
+                            }
                             wrapper.read(BedrockTypes.STRING); // creator id
-                            wrapper.read(BedrockTypes.UUID); // target id
-                            wrapper.read(BedrockTypes.STRING); // scenario id
-                            wrapper.read(BedrockTypes.STRING); // server id
+                            if (wrapper.read(Types.BOOLEAN)) { // has target id
+                                wrapper.read(BedrockTypes.UUID); // target id
+                            }
+                            if (wrapper.read(Types.BOOLEAN)) {
+                                wrapper.read(BedrockTypes.STRING); // scenario id
+                            }
+                            if (wrapper.read(Types.BOOLEAN)) { // has server id
+                                wrapper.read(BedrockTypes.STRING); // server id
+                            }
                         }
                         if (wrapper.read(Types.BOOLEAN)) { // has store entry point info
                             wrapper.read(BedrockTypes.STRING); // store id

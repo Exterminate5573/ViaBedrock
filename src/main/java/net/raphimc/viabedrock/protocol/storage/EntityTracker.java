@@ -172,7 +172,11 @@ public class EntityTracker extends StoredObject {
     }
 
     public Entity getEntityByRid(final long runtimeId) {
-        return this.entities.get((long) this.runtimeIdToUniqueId.get(runtimeId));
+        Long uniqueId = this.runtimeIdToUniqueId.get(runtimeId);
+        if (uniqueId == null) {
+            return null;
+        }
+        return this.entities.get(uniqueId.longValue());
     }
 
     public Entity getEntityByUid(final long uniqueId) {
