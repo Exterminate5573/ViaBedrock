@@ -21,10 +21,10 @@ import com.viaversion.viaversion.api.protocol.packet.State;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandler;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.base.ClientboundLoginPackets;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ServerboundPackets26_1;
-import com.viaversion.viaversion.protocols.v1_21_7to1_21_9.packet.ClientboundConfigurationPackets1_21_9;
 import com.viaversion.viaversion.protocols.v1_21_7to1_21_9.packet.ServerboundConfigurationPackets1_21_9;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundConfigurationPackets26_3;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 import com.viaversion.viaversion.util.Key;
 import net.lenni0451.mcstructs_bedrock.text.utils.BedrockTranslator;
 import net.raphimc.viabedrock.ViaBedrock;
@@ -35,7 +35,7 @@ import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.DataValues;
 import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.Connection_DisconnectFailReason;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.DisconnectFailReason;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.MinecraftPacketIds;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PacketViolationSeverity;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PacketViolationType;
@@ -51,10 +51,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Level;
 
-public class MultiStatePackets {
+public final class MultiStatePackets {
 
     private static final PacketHandler DISCONNECT_HANDLER = wrapper -> {
-        final Connection_DisconnectFailReason disconnectReason = Connection_DisconnectFailReason.getByValue(wrapper.read(BedrockTypes.VAR_INT), Connection_DisconnectFailReason.Unknown); // reason
+        final DisconnectFailReason disconnectReason = DisconnectFailReason.getByValue(wrapper.read(BedrockTypes.VAR_INT), DisconnectFailReason.Unknown); // reason
         final boolean hasMessage = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT) == 0; // has message
         if (hasMessage) {
             final Map<String, String> translations = BedrockProtocol.MAPPINGS.getBedrockResourcePacks().get(DataValues.VANILLA_RESOURCE_PACK_KEY).content().getLang("texts/en_US.lang");
@@ -77,11 +77,11 @@ public class MultiStatePackets {
         final MinecraftPacketIds packet = MinecraftPacketIds.getByValue(packetIdCause);
 
         final String reason = "§4Packet violation warning: §c"
-                + type.name()
-                + " (" + severity.name() + ")\n"
-                + "Violating Packet: " + (packet != null ? packet.name() : packetIdCause) + "\n"
-                + (context.isEmpty() ? "No context provided" : (" Context: '" + context + "'"))
-                + "\n\nPlease report this issue on the ViaBedrock GitHub page!";
+            + type.name()
+            + " (" + severity.name() + ")\n"
+            + "Violating Packet: " + (packet != null ? packet.name() : packetIdCause) + "\n"
+            + (context.isEmpty() ? "No context provided" : (" Context: '" + context + "'"))
+            + "\n\nPlease report this issue on the ViaBedrock GitHub page!";
         PacketFactory.writeJavaDisconnect(wrapper, reason);
     };
 
@@ -141,34 +141,37 @@ public class MultiStatePackets {
 
     public static void register(final BedrockProtocol protocol) {
         protocol.registerClientboundTransition(ClientboundBedrockPackets.DISCONNECT,
-                ClientboundPackets26_1.DISCONNECT, DISCONNECT_HANDLER,
-                ClientboundLoginPackets.LOGIN_DISCONNECT, DISCONNECT_HANDLER,
-                ClientboundConfigurationPackets1_21_9.DISCONNECT, DISCONNECT_HANDLER
+            ClientboundPackets26_3.DISCONNECT, DISCONNECT_HANDLER,
+            ClientboundLoginPackets.LOGIN_DISCONNECT, DISCONNECT_HANDLER,
+            ClientboundConfigurationPackets26_3.DISCONNECT, DISCONNECT_HANDLER
         );
         protocol.registerClientboundTransition(ClientboundBedrockPackets.PACKET_VIOLATION_WARNING,
-                ClientboundPackets26_1.DISCONNECT, PACKET_VIOLATION_WARNING_HANDLER,
-                ClientboundLoginPackets.LOGIN_DISCONNECT, PACKET_VIOLATION_WARNING_HANDLER,
-                ClientboundConfigurationPackets1_21_9.DISCONNECT, PACKET_VIOLATION_WARNING_HANDLER
+            ClientboundPackets26_3.DISCONNECT, PACKET_VIOLATION_WARNING_HANDLER,
+            ClientboundLoginPackets.LOGIN_DISCONNECT, PACKET_VIOLATION_WARNING_HANDLER,
+            ClientboundConfigurationPackets26_3.DISCONNECT, PACKET_VIOLATION_WARNING_HANDLER
         );
         protocol.registerClientboundTransition(ClientboundBedrockPackets.NETWORK_STACK_LATENCY,
-                ClientboundPackets26_1.PING, NETWORK_STACK_LATENCY_HANDLER,
-                State.LOGIN, (PacketHandler) wrapper -> {
-                    NETWORK_STACK_LATENCY_HANDLER.handle(wrapper);
+            ClientboundPackets26_3.PING, NETWORK_STACK_LATENCY_HANDLER,
+            State.LOGIN, (PacketHandler) wrapper -> {
+                NETWORK_STACK_LATENCY_HANDLER.handle(wrapper);
+                if (!wrapper.isCancelled()) {
+                    wrapper.resetReader();
+                    PONG_HANDLER.handle(wrapper);
                     if (!wrapper.isCancelled()) {
-                        wrapper.resetReader();
-                        PONG_HANDLER.handle(wrapper);
-                        if (!wrapper.isCancelled()) {
-                            wrapper.setPacketType(ServerboundBedrockPackets.NETWORK_STACK_LATENCY);
-                            wrapper.sendToServer(BedrockProtocol.class);
-                            wrapper.cancel();
-                        }
+                        wrapper.setPacketType(ServerboundBedrockPackets.NETWORK_STACK_LATENCY);
+                        wrapper.sendToServer(BedrockProtocol.class);
+                        wrapper.cancel();
                     }
-                },
-                ClientboundConfigurationPackets1_21_9.PING, NETWORK_STACK_LATENCY_HANDLER
+                }
+            },
+            ClientboundConfigurationPackets26_3.PING, NETWORK_STACK_LATENCY_HANDLER
         );
 
-        protocol.registerServerbound(ServerboundPackets26_1.PONG, ServerboundBedrockPackets.NETWORK_STACK_LATENCY, PONG_HANDLER);
+        protocol.registerServerbound(ServerboundPackets26_3.PONG, ServerboundBedrockPackets.NETWORK_STACK_LATENCY, PONG_HANDLER);
         protocol.registerServerboundTransition(ServerboundConfigurationPackets1_21_9.PONG, ServerboundBedrockPackets.NETWORK_STACK_LATENCY, PONG_HANDLER);
+    }
+
+    private MultiStatePackets() {
     }
 
 }

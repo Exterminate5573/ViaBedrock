@@ -23,14 +23,17 @@ import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.api.minecraft.item.StructuredItem;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacket_Action;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
@@ -47,6 +50,15 @@ public class InventoryContainer extends Container {
     public InventoryContainer(final UserConnection user, final byte containerId, final BlockPosition position, final InventoryContainer inventoryContainer) {
         super(user, containerId, inventoryContainer.type, inventoryContainer.title, position, inventoryContainer.items, inventoryContainer.validBlockTags);
         this.selectedHotbarSlot = inventoryContainer.selectedHotbarSlot;
+    }
+
+    @Override
+    public FullContainerName getFullContainerName(final int slot) {
+        if (slot < 9) {
+            return new FullContainerName(ContainerEnumName.HotbarContainer, null);
+        }
+
+        return new FullContainerName(ContainerEnumName.InventoryContainer, null);
     }
 
     @Override
@@ -88,6 +100,15 @@ public class InventoryContainer extends Container {
     }
 
     @Override
+    public int bedrockSlot(final int slot) {
+        if (slot >= 36 && slot < 45) {
+            return slot - 36;
+        } else {
+            return super.bedrockSlot(slot);
+        }
+    }
+
+    @Override
     public byte javaContainerId() {
         return (byte) ContainerID.CONTAINER_ID_INVENTORY.getValue();
     }
@@ -101,7 +122,7 @@ public class InventoryContainer extends Container {
     }
 
     public void sendSelectedHotbarSlotToClient() {
-        final PacketWrapper setHeldSlot = PacketWrapper.create(ClientboundPackets26_1.SET_HELD_SLOT, this.user);
+        final PacketWrapper setHeldSlot = PacketWrapper.create(ClientboundPackets26_3.SET_HELD_SLOT, this.user);
         setHeldSlot.write(Types.VAR_INT, (int) this.selectedHotbarSlot);
         setHeldSlot.send(BedrockProtocol.class);
     }
@@ -126,7 +147,7 @@ public class InventoryContainer extends Container {
     private void onSelectedHotbarSlotChanged(final BedrockItem oldItem, final BedrockItem newItem, final PacketWrapper mobEquipment) {
         if (oldItem.isDifferent(newItem)) {
             final PacketWrapper interact = PacketWrapper.create(ServerboundBedrockPackets.INTERACT, this.user);
-            interact.write(Types.UNSIGNED_BYTE, (short) InteractPacket_Action.InteractUpdate.getValue()); // action
+            interact.write(Types.UNSIGNED_BYTE, (short) InteractPacketPayload_Action.InteractUpdate.getValue()); // action
             interact.write(BedrockTypes.UNSIGNED_VAR_LONG, 0L); // target entity runtime id
             interact.write(BedrockTypes.OPTIONAL_POSITION_3F, null); // position
             interact.sendToServer(BedrockProtocol.class);

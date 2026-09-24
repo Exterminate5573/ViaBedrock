@@ -23,6 +23,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.fastutil.ints.IntObjectPair;
 import net.lenni0451.mcstructs_bedrock.forms.Form;
+
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.model.container.dynamic.BundleContainer;
@@ -66,10 +67,18 @@ public class InventoryTracker extends StoredObject {
     }
 
     public Container getContainerClientbound(final byte containerId, final FullContainerName containerName, final BedrockItem storageItem) {
-        if (containerId == this.inventoryContainer.containerId()) return this.inventoryContainer;
-        if (containerId == this.offhandContainer.containerId()) return this.offhandContainer;
-        if (containerId == this.armorContainer.containerId()) return this.armorContainer;
-        if (containerId == this.hudContainer.containerId()) return this.hudContainer;
+        if (containerId == this.inventoryContainer.containerId()) {
+            return this.inventoryContainer;
+        }
+        if (containerId == this.offhandContainer.containerId()) {
+            return this.offhandContainer;
+        }
+        if (containerId == this.armorContainer.containerId()) {
+            return this.armorContainer;
+        }
+        if (containerId == this.hudContainer.containerId()) {
+            return this.hudContainer;
+        }
         if (containerId == ContainerID.CONTAINER_ID_REGISTRY.getValue() && containerName.name() == ContainerEnumName.DynamicContainer) {
             final String itemTag = BedrockProtocol.MAPPINGS.getBedrockCustomItemTags().get(this.user().get(ItemRewriter.class).getItems().inverse().get(storageItem.identifier()));
             if (!storageItem.isEmpty() && CustomItemTags.BUNDLE.equals(itemTag)) {
@@ -86,6 +95,28 @@ public class InventoryTracker extends StoredObject {
 
     public Container getContainerServerbound(final byte containerId) {
         if (this.currentContainer != null && containerId == this.currentContainer.javaContainerId()) {
+            return this.currentContainer;
+        }
+        return null;
+    }
+
+    public Container getContainerFromName(final FullContainerName containerName, final int slot) {
+        if (containerName.name() == ContainerEnumName.InventoryContainer || containerName.name() == ContainerEnumName.HotbarContainer) {
+            return this.inventoryContainer;
+        }
+        if (containerName.name() == ContainerEnumName.OffhandContainer) {
+            return this.offhandContainer;
+        }
+        if (containerName.name() == ContainerEnumName.ArmorContainer) {
+            return this.armorContainer;
+        }
+        if (containerName.name() == ContainerEnumName.CursorContainer || containerName.name() == ContainerEnumName.CraftingInputContainer) {
+            return this.hudContainer;
+        }
+        if (containerName.name() == ContainerEnumName.DynamicContainer) {
+            return this.dynamicContainerRegistry.get(containerName);
+        }
+        if (this.currentContainer != null && containerName.equals(this.currentContainer.getFullContainerName(slot))) {
             return this.currentContainer;
         }
         return null;
@@ -113,6 +144,7 @@ public class InventoryTracker extends StoredObject {
         if (serverInitiated) {
             PacketFactory.sendBedrockContainerClose(this.user(), this.currentContainer.containerId(), ContainerType.NONE);
         }
+        this.hudContainer.setItem(0, BedrockItem.empty());
         this.currentContainer = null;
         this.pendingCloseContainer = null;
     }
@@ -132,7 +164,9 @@ public class InventoryTracker extends StoredObject {
 
     public void tick() {
         if (this.currentContainer != null && this.currentContainer.position() != null) {
-            if (this.currentContainer.type() == ContainerType.INVENTORY) return;
+            if (this.currentContainer.type() == ContainerType.INVENTORY) {
+                return;
+            }
 
             final ChunkTracker chunkTracker = this.user().get(ChunkTracker.class);
             final BlockStateRewriter blockStateRewriter = this.user().get(BlockStateRewriter.class);

@@ -21,6 +21,7 @@ import com.viaversion.nbt.tag.IntTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.util.Pair;
+
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
@@ -41,10 +42,15 @@ public class BundleContainer extends Container {
     }
 
     @Override
+    public FullContainerName getFullContainerName(final int slot) {
+        return this.containerName;
+    }
+
+    @Override
     public Item getJavaItem(final int slot) {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().getJavaItem(holdingContainer.value());
@@ -54,7 +60,7 @@ public class BundleContainer extends Container {
     public Item[] getJavaItems() {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().getJavaItems();
@@ -79,17 +85,27 @@ public class BundleContainer extends Container {
     public int javaSlot(final int slot) {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().javaSlot(holdingContainer.value());
     }
 
     @Override
+    public int bedrockSlot(final int slot) {
+        final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
+        if (holdingContainer == null) {
+            throw new IllegalStateException("Could not find bundle in any container");
+        }
+
+        return holdingContainer.key().bedrockSlot(holdingContainer.value());
+    }
+
+    @Override
     public byte javaContainerId() {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().javaContainerId();
@@ -102,27 +118,27 @@ public class BundleContainer extends Container {
     private Pair<Container, Integer> findHoldingContainer() {
         final InventoryTracker inventoryTracker = this.user.get(InventoryTracker.class);
 
-        int slot = findBundleInContainer(inventoryTracker.getInventoryContainer());
+        int slot = this.findBundleInContainer(inventoryTracker.getInventoryContainer());
         if (slot != -1) {
             return new Pair<>(inventoryTracker.getInventoryContainer(), slot);
         }
 
-        slot = findBundleInContainer(inventoryTracker.getCurrentContainer());
+        slot = this.findBundleInContainer(inventoryTracker.getCurrentContainer());
         if (slot != -1) {
             return new Pair<>(inventoryTracker.getCurrentContainer(), slot);
         }
 
-        slot = findBundleInContainer(inventoryTracker.getOffhandContainer());
+        slot = this.findBundleInContainer(inventoryTracker.getOffhandContainer());
         if (slot != -1) {
             return new Pair<>(inventoryTracker.getOffhandContainer(), slot);
         }
 
-        slot = findBundleInContainer(inventoryTracker.getArmorContainer());
+        slot = this.findBundleInContainer(inventoryTracker.getArmorContainer());
         if (slot != -1) {
             return new Pair<>(inventoryTracker.getArmorContainer(), slot);
         }
 
-        slot = findBundleInContainer(inventoryTracker.getHudContainer());
+        slot = this.findBundleInContainer(inventoryTracker.getHudContainer());
         if (slot != -1) {
             return new Pair<>(inventoryTracker.getHudContainer(), slot);
         }
@@ -131,20 +147,28 @@ public class BundleContainer extends Container {
     }
 
     private int findBundleInContainer(final Container container) {
-        if (container == null) return -1;
+        if (container == null) {
+            return -1;
+        }
 
         final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
 
         final BedrockItem[] items = container.getItems();
         for (int i = 0; i < items.length; i++) {
             final BedrockItem item = items[i];
-            if (item.isEmpty() || item.tag() == null) continue;
+            if (item.isEmpty() || item.tag() == null) {
+                continue;
+            }
 
             final String itemTag = BedrockProtocol.MAPPINGS.getBedrockCustomItemTags().get(itemRewriter.getItems().inverse().get(item.identifier()));
-            if (!CustomItemTags.BUNDLE.equals(itemTag)) continue;
+            if (!CustomItemTags.BUNDLE.equals(itemTag)) {
+                continue;
+            }
 
             final IntTag bundleIdTag = item.tag().getIntTag("bundle_id");
-            if (bundleIdTag == null || bundleIdTag.asInt() == 0) continue;
+            if (bundleIdTag == null || bundleIdTag.asInt() == 0) {
+                continue;
+            }
 
             if (bundleIdTag.asInt() == this.containerName.dynamicId()) {
                 return i;

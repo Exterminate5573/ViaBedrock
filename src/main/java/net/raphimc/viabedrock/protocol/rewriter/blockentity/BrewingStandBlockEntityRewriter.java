@@ -31,30 +31,32 @@ import java.util.List;
 public class BrewingStandBlockEntityRewriter implements BlockEntityRewriter.Rewriter {
 
     @Override
-    public BlockEntity toJava(UserConnection user, BedrockBlockEntity bedrockBlockEntity) {
+    public BlockEntity toJava(final UserConnection user, final BedrockBlockEntity bedrockBlockEntity) {
         final CompoundTag bedrockTag = bedrockBlockEntity.tag();
         final CompoundTag javaTag = new CompoundTag();
 
-        List<CompoundTag> items = bedrockTag.getListTag("Items", CompoundTag.class).getValue();
-        ListTag<CompoundTag> javaItems = new ListTag<>(CompoundTag.class);
-        for (CompoundTag item : items) {
-            CompoundTag javaItem = this.rewriteItem(user, item);
-            byte newSlot = switch (item.getByte("Slot")) {
-                case 0 -> 3; // Ingredient Slot
-                case 1 -> 0; // Potion slots
-                case 2 -> 1;
-                case 3 -> 2;
-                case 4 -> 4; // Fuel slot
-                default -> -1; // Invalid slot, should not happen
-            };
+        if (bedrockTag.contains("Items")) {
+            final List<CompoundTag> items = bedrockTag.getListTag("Items", CompoundTag.class).getValue();
+            final ListTag<CompoundTag> javaItems = new ListTag<>(CompoundTag.class);
+            for (CompoundTag item : items) {
+                final CompoundTag javaItem = this.rewriteItem(user, item);
+                final byte newSlot = switch (item.getByte("Slot")) {
+                    case 0 -> 3; // Ingredient Slot
+                    case 1 -> 0; // Potion slots
+                    case 2 -> 1;
+                    case 3 -> 2;
+                    case 4 -> 4; // Fuel slot
+                    default -> -1; // Invalid slot, should not happen
+                };
 
-            javaItem.putByte("Slot", newSlot);
-            javaItems.add(javaItem);
+                javaItem.putByte("Slot", newSlot);
+                javaItems.add(javaItem);
+            }
+            javaTag.put("Items", javaItems);
         }
-        javaTag.put("Items", javaItems);
 
         this.copy(bedrockTag, javaTag, "CookTime", "BrewTime", ShortTag.class);
-        byte fuel = (byte) bedrockTag.getShort("FuelAmount");
+        final byte fuel = (byte) bedrockTag.getShort("FuelAmount");
         javaTag.putByte("Fuel", fuel);
 
         return new BlockEntityImpl(bedrockBlockEntity.packedXZ(), bedrockBlockEntity.y(), -1, javaTag);

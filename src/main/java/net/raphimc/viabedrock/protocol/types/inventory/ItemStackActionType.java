@@ -1,0 +1,151 @@
+/*
+ * This file is part of ViaBedrock - https://github.com/RaphiMC/ViaBedrock
+ * Copyright (C) 2023-2025 RK_01/RaphiMC and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+package net.raphimc.viabedrock.protocol.types.inventory;
+
+import com.viaversion.viaversion.api.type.Type;
+import io.netty.buffer.ByteBuf;
+
+import net.raphimc.viabedrock.protocol.model.ItemEntry;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
+import net.raphimc.viabedrock.protocol.types.BedrockTypes;
+import net.raphimc.viabedrock.protocol.types.InventoryTypes;
+
+public class ItemStackActionType extends Type<ItemStackRequestAction> {
+
+    public ItemStackActionType() {
+        super(ItemStackRequestAction.class);
+    }
+
+    @Override
+    public ItemStackRequestAction read(final ByteBuf buffer) {
+        return null;
+    }
+
+    @Override
+    public void write(final ByteBuf buffer, final ItemStackRequestAction value) {
+        buffer.writeByte(value.getType().getValue());
+        switch (value.getType()) {
+            case Take -> {
+                final ItemStackRequestAction.TakeAction takeAction = (ItemStackRequestAction.TakeAction) value;
+
+                buffer.writeByte(takeAction.count());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, takeAction.source());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, takeAction.destination());
+            }
+            case Place -> {
+                final ItemStackRequestAction.PlaceAction placeAction = (ItemStackRequestAction.PlaceAction) value;
+
+                buffer.writeByte(placeAction.count());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, placeAction.source());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, placeAction.destination());
+            }
+            case Swap -> {
+                final ItemStackRequestAction.SwapAction swapAction = (ItemStackRequestAction.SwapAction) value;
+
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, swapAction.source());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, swapAction.destination());
+            }
+            case Drop -> {
+                final ItemStackRequestAction.DropAction dropAction = (ItemStackRequestAction.DropAction) value;
+
+                buffer.writeByte(dropAction.count());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, dropAction.item());
+                buffer.writeBoolean(dropAction.randomly());
+            }
+            case Destroy -> {
+                final ItemStackRequestAction.DestroyAction destroyAction = (ItemStackRequestAction.DestroyAction) value;
+
+                buffer.writeByte(destroyAction.count());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, destroyAction.item());
+            }
+            case Consume -> {
+                final ItemStackRequestAction.ConsumeAction consumeAction = (ItemStackRequestAction.ConsumeAction) value;
+
+                buffer.writeByte(consumeAction.count());
+                InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, consumeAction.item());
+            }
+            case Create -> {
+                final ItemStackRequestAction.CreateAction createAction = (ItemStackRequestAction.CreateAction) value;
+
+                buffer.writeByte(createAction.slot());
+            }
+            case ScreenBeaconPayment -> {
+                final ItemStackRequestAction.BeaconPaymentAction screenBeaconPaymentAction = (ItemStackRequestAction.BeaconPaymentAction) value;
+
+                BedrockTypes.VAR_INT.write(buffer, screenBeaconPaymentAction.primaryEvent());
+                BedrockTypes.VAR_INT.write(buffer, screenBeaconPaymentAction.secondaryEvent());
+            }
+            case CraftRecipe -> {
+                final ItemStackRequestAction.CraftRecipeAction craftRecipeAction = (ItemStackRequestAction.CraftRecipeAction) value;
+
+                BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftRecipeAction.recipeNetworkId());
+                buffer.writeByte(craftRecipeAction.numberOfRequestedCrafts());
+            }
+            case CraftRecipeAuto -> {
+                final ItemStackRequestAction.AutoCraftRecipeAction craftRecipeAutoAction = (ItemStackRequestAction.AutoCraftRecipeAction) value;
+
+                BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftRecipeAutoAction.recipeNetworkId());
+                buffer.writeByte(craftRecipeAutoAction.numberOfRequestedCrafts());
+                buffer.writeByte(craftRecipeAutoAction.timesCrafted());
+                BedrockTypes.ITEM_ENTRY_ARRAY.write(buffer, craftRecipeAutoAction.ingredients().toArray(new ItemEntry[0]));
+            }
+            case CraftCreative -> {
+                final ItemStackRequestAction.CraftCreativeAction craftCreativeAction = (ItemStackRequestAction.CraftCreativeAction) value;
+
+                BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftCreativeAction.creativeItemNetworkId());
+                buffer.writeByte(craftCreativeAction.numberOfRequestedCrafts());
+            }
+            case CraftRecipeOptional -> {
+                final ItemStackRequestAction.CraftRecipeOptionalAction craftRecipeOptionalAction = (ItemStackRequestAction.CraftRecipeOptionalAction) value;
+
+                BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftRecipeOptionalAction.recipeNetworkId());
+                BedrockTypes.INT_LE.write(buffer, craftRecipeOptionalAction.filteredStringIndex());
+            }
+            case ScreenHUDMineBlock -> {
+                final ItemStackRequestAction.MineBlockAction hudMineBlockAction = (ItemStackRequestAction.MineBlockAction) value;
+
+                BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.hotbarSlot());
+                BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.predictedDurability());
+                BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.stackNetworkId());
+            }
+            case CraftRepairAndDisenchant -> {
+                final ItemStackRequestAction.CraftGrindstoneAction craftGrindstoneAction = (ItemStackRequestAction.CraftGrindstoneAction) value;
+
+                BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftGrindstoneAction.recipeNetworkId());
+                buffer.writeByte(craftGrindstoneAction.numberOfRequestedCrafts());
+                BedrockTypes.VAR_INT.write(buffer, craftGrindstoneAction.repairCost());
+            }
+            case CraftLoom -> {
+                final ItemStackRequestAction.CraftLoomAction craftLoomAction = (ItemStackRequestAction.CraftLoomAction) value;
+
+                BedrockTypes.STRING.write(buffer, craftLoomAction.patternId());
+                buffer.writeByte(craftLoomAction.timesCrafted());
+            }
+            case CraftNonImplemented -> {
+            }
+            case CraftResults -> {
+                final ItemStackRequestAction.CraftResultsDeprecatedAction craftResultsAction = (ItemStackRequestAction.CraftResultsDeprecatedAction) value;
+
+                BedrockTypes.ITEM_ENTRY_ARRAY.write(buffer, craftResultsAction.resultItems().toArray(new ItemEntry[0]));
+                buffer.writeByte(craftResultsAction.timesCrafted());
+            }
+
+        }
+    }
+
+}

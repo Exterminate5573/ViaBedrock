@@ -38,7 +38,7 @@ import com.viaversion.viaversion.api.connection.StoredObject;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import com.viaversion.viaversion.util.Pair;
 import net.lenni0451.mcstructs_bedrock.text.utils.BedrockTranslator;
 import net.lenni0451.mcstructs_bedrock.text.utils.TranslatorOptions;
@@ -50,7 +50,7 @@ import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.ArgumentTypeRegistry;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.CommandEnumConstraints;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.CommandFlags;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.CommandParameterOption;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.CommandParameterOption;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.CommandPermissionLevel;
 import net.raphimc.viabedrock.protocol.model.CommandData;
 
@@ -94,7 +94,7 @@ public class CommandsStorage extends StoredObject {
     }
 
     public void updateCommandTree() {
-        final PacketWrapper commands = PacketWrapper.create(ClientboundPackets26_1.COMMANDS, this.user());
+        final PacketWrapper commands = PacketWrapper.create(ClientboundPackets26_3.COMMANDS, this.user());
         this.writeCommandTree(commands);
         commands.send(BedrockProtocol.class);
     }
@@ -168,7 +168,7 @@ public class CommandsStorage extends StoredObject {
         final ParseResults<UserConnection> parseResults = this.dispatcher.parse(reader, this.user());
         try {
             return this.dispatcher.execute(parseResults);
-        } catch (Throwable ignored) {
+        } catch (final Throwable ignored) {
             if (!parseResults.getContext().getNodes().isEmpty()) {
                 return RESULT_ALLOW_SEND;
             }
@@ -190,7 +190,9 @@ public class CommandsStorage extends StoredObject {
 
         for (CommandData command : this.commands) {
             final String name = command.alias() != null ? Iterables.getFirst(command.alias().values().keySet(), null) : command.name();
-            if (name == null) continue;
+            if (name == null) {
+                continue;
+            }
 
             if (playerCommandPermission < command.permission()) {
                 continue;
