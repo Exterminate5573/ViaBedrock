@@ -29,21 +29,21 @@ public class ItemStackSlotResponseType extends Type<ItemStackResponseSlotInfo> {
     }
 
     @Override
-    public ItemStackResponseSlotInfo read(ByteBuf buffer) {
+    public ItemStackResponseSlotInfo read(final ByteBuf buffer) {
 
-        byte requestedSlot = buffer.readByte();
-        byte slot = buffer.readByte();
-        byte amount = buffer.readByte();
-        int itemNetId = BedrockTypes.VAR_INT.read(buffer);
-        String customName = BedrockTypes.STRING.read(buffer);
-        String filteredCustomName = BedrockTypes.STRING.read(buffer);
-        int durability = BedrockTypes.VAR_INT.read(buffer);
+        final byte requestedSlot = buffer.readByte();
+        final byte slot = buffer.readByte();
+        final byte amount = buffer.readByte();
+        final int itemNetId = BedrockTypes.VAR_INT.read(buffer);
+        final String customName = BedrockTypes.STRING.read(buffer);
+        final String filteredCustomName = BedrockTypes.STRING.read(buffer);
+        final int durability = BedrockTypes.VAR_INT.read(buffer);
 
         return new ItemStackResponseSlotInfo(requestedSlot, slot, amount, itemNetId, customName, filteredCustomName, durability);
     }
 
     @Override
-    public void write(ByteBuf buffer, ItemStackResponseSlotInfo value) {
+    public void write(final ByteBuf buffer, final ItemStackResponseSlotInfo value) {
         buffer.writeByte(value.requestedSlot());
         buffer.writeByte(value.slot());
         buffer.writeByte(value.amount());

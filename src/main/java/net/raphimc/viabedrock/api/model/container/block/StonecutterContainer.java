@@ -52,12 +52,12 @@ public class StonecutterContainer extends Container {
     private final List<CraftingDataStorage> currentRecipes = new ArrayList<>();
     private int selectedRecipe = 0;
 
-    public StonecutterContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public StonecutterContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.STONECUTTER, title, position, 2, "stonecutter_block", "stonecutter");
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case 3 -> new FullContainerName(ContainerEnumName.StonecutterInputContainer, null);
             case 50 -> new FullContainerName(ContainerEnumName.CreatedOutputContainer, null); //TODO: CreatedOutputContainer?
@@ -84,7 +84,7 @@ public class StonecutterContainer extends Container {
     }
 
     @Override
-    public BedrockItem getItem(int bedrockSlot) {
+    public BedrockItem getItem(final int bedrockSlot) {
         if (bedrockSlot == 3) {
             return this.items[0];
         } else if (bedrockSlot == 50) {
@@ -123,7 +123,7 @@ public class StonecutterContainer extends Container {
             return result;
         }
 
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
         final CraftingDataStorage craftingDataStorage = this.currentRecipes.get(this.selectedRecipe);
         BedrockItem resultItem = BedrockItem.empty();
         if (craftingDataStorage != null) {
@@ -134,7 +134,7 @@ public class StonecutterContainer extends Container {
             }
         }
 
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
+        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, 0); // Revision
         containerSlot.write(Types.SHORT, (short) 1); // Output slot
@@ -145,22 +145,22 @@ public class StonecutterContainer extends Container {
             return result;
         }
 
-        InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
 
-        List<Container> prevContainers = new ArrayList<>();
+        final List<Container> prevContainers = new ArrayList<>();
         prevContainers.add(this.copy());
         prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-        Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
+        final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-        int nextRequestId = inventoryRequestTracker.nextRequestId();
-        BedrockItem sourceItem = this.getItem(3);
+        final int nextRequestId = inventoryRequestTracker.nextRequestId();
+        final BedrockItem sourceItem = this.getItem(3);
 
-        int craftableAmount = 1;
-        int toConsume = Math.min(sourceItem.amount(), craftableAmount);
+        final int craftableAmount = 1;
+        final int toConsume = Math.min(sourceItem.amount(), craftableAmount);
         // TODO: shift click = max to inventory
 
-        List<ItemStackRequestAction> actions = new ArrayList<>();
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
         actions.add(new ItemStackRequestAction.ConsumeAction(
                 toConsume,
@@ -184,7 +184,7 @@ public class StonecutterContainer extends Container {
                 )
         ));
 
-        ItemStackRequestInfo request = new ItemStackRequestInfo(
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(
                 nextRequestId,
                 actions,
                 List.of(),
@@ -195,7 +195,7 @@ public class StonecutterContainer extends Container {
         PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
 
         inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
-        BedrockItem newSrc = sourceItem.copy();
+        final BedrockItem newSrc = sourceItem.copy();
         newSrc.setAmount(sourceItem.amount() - 1);
         this.setItem(3, newSrc);
 
@@ -214,7 +214,7 @@ public class StonecutterContainer extends Container {
         }
 
         this.selectedRecipe = button;
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
 
         final CraftingDataStorage craftingDataStorage = this.currentRecipes.get(button);
         BedrockItem resultItem = BedrockItem.empty();
@@ -226,7 +226,7 @@ public class StonecutterContainer extends Container {
             }
         }
 
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
+        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, 0); // Revision
         containerSlot.write(Types.SHORT, (short) 1); // Output slot
@@ -237,8 +237,8 @@ public class StonecutterContainer extends Container {
     }
 
     // TODO: Refactor to CraftingDataTracker
-    private void updateRecipeData(BedrockItem item) {
-        CraftingDataTracker craftingDataTracker = user.get(CraftingDataTracker.class);
+    private void updateRecipeData(final BedrockItem item) {
+        final CraftingDataTracker craftingDataTracker = user.get(CraftingDataTracker.class);
         this.currentRecipes.clear();
 
         for (CraftingDataStorage craftingData : craftingDataTracker.getCraftingDataList()) {
@@ -248,7 +248,7 @@ public class StonecutterContainer extends Container {
 
             switch (craftingData.type()) {
                 case SHAPELESS -> {
-                    ShapelessRecipe recipe = (ShapelessRecipe) craftingData.recipe();
+                    final ShapelessRecipe recipe = (ShapelessRecipe) craftingData.recipe();
                     if (recipe.getIngredients().get(0).matchesItem(this.user, item)) {
                         this.currentRecipes.add(craftingData);
                     }

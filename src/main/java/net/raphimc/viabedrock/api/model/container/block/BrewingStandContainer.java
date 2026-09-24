@@ -29,12 +29,12 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class BrewingStandContainer extends Container {
 
-    public BrewingStandContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public BrewingStandContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.BREWING_STAND, title, position, 5, CustomBlockTags.BREWING_STAND);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case 0 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
             case 1, 2, 3 -> new FullContainerName(ContainerEnumName.BrewingStandResultContainer, null);
@@ -64,11 +64,12 @@ public class BrewingStandContainer extends Container {
     }
 
     @Override
-    public short translateContainerData(int containerData) {
+    public short translateContainerData(final int containerData) {
         return switch (containerData) {
             case 0 -> 0; // Progress arrow
             case 1 -> 1; // Fuel progress
             default -> -1; // Unknown
         };
     }
+
 }

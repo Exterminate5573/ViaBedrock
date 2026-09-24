@@ -51,15 +51,14 @@ import java.util.logging.Level;
 
 public class CraftingTableContainer extends Container {
 
-    public CraftingTableContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public CraftingTableContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.WORKBENCH, title, position, 10, CustomBlockTags.WORKBENCH);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
-            case 32, 33, 34, 35, 36, 37, 38, 39, 40 ->
-                    new FullContainerName(ContainerEnumName.CraftingInputContainer, null);
+            case 32, 33, 34, 35, 36, 37, 38, 39, 40 -> new FullContainerName(ContainerEnumName.CraftingInputContainer, null);
             case 50 -> new FullContainerName(ContainerEnumName.CreatedOutputContainer, null);
             default -> throw new IllegalArgumentException("Invalid slot for Crafting Container: " + slot);
         };
@@ -84,7 +83,7 @@ public class CraftingTableContainer extends Container {
     }
 
     @Override
-    public BedrockItem getItem(int bedrockSlot) {
+    public BedrockItem getItem(final int bedrockSlot) {
         return switch (bedrockSlot) {
             case 50 -> this.items[0];
             case 32, 33, 34, 35, 36, 37, 38, 39, 40 -> this.items[bedrockSlot - 31];
@@ -109,8 +108,8 @@ public class CraftingTableContainer extends Container {
             result = super.handleClick(revision, javaSlot, button, action);
         }
 
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-        CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
         final CraftingDataStorage craftingDataStorage = tracker.getRecipeData(this, "crafting_table");
         BedrockItem resultItem = BedrockItem.empty();
         if (craftingDataStorage != null) {
@@ -126,7 +125,7 @@ public class CraftingTableContainer extends Container {
         }
 
         //this.setItem(0, resultItem);
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
+        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, revision);
         containerSlot.write(Types.SHORT, (short) 0); // Output slot
@@ -138,28 +137,28 @@ public class CraftingTableContainer extends Container {
             return result;
         }
 
-        InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
 
-        List<Container> prevContainers = new ArrayList<>();
+        final List<Container> prevContainers = new ArrayList<>();
         prevContainers.add(this.copy());
         prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-        Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
+        final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-        int craftableAmount = 1;
+        final int craftableAmount = 1;
 
-        int bedrockSlot = this.bedrockSlot(javaSlot);
+        final int bedrockSlot = this.bedrockSlot(javaSlot);
         // TODO: shift click = max to inventory
 
-        List<ItemStackRequestAction> actions = new ArrayList<>();
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
         //actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(resultItems, 1)); //TODO: Deprecated action, hopefully removed in the future
 
         for (int i = 1; i <= 9; i++) {
-            int inputSlot = i + 31; // Crafting grid slots in bedrock
-            BedrockItem item = this.getItem(inputSlot);
+            final int inputSlot = i + 31; // Crafting grid slots in bedrock
+            final BedrockItem item = this.getItem(inputSlot);
             if (!item.isEmpty() && item.amount() > 0) {
-                int toConsume = Math.min(item.amount(), craftableAmount);
+                final int toConsume = Math.min(item.amount(), craftableAmount);
                 actions.add(new ItemStackRequestAction.ConsumeAction(
                         toConsume,
                         new ItemStackRequestSlotInfo(
@@ -171,7 +170,7 @@ public class CraftingTableContainer extends Container {
             }
         }
 
-        int nextRequestId = inventoryRequestTracker.nextRequestId();
+        final int nextRequestId = inventoryRequestTracker.nextRequestId();
         actions.add(
                 new ItemStackRequestAction.TakeAction(
                         craftableAmount * resultItem.amount(), // Total amount to take
@@ -188,7 +187,7 @@ public class CraftingTableContainer extends Container {
                 )
         );
 
-        ItemStackRequestInfo request = new ItemStackRequestInfo(
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(
                 nextRequestId,
                 actions,
                 List.of(),
@@ -200,10 +199,10 @@ public class CraftingTableContainer extends Container {
 
         inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
         for (int i = 1; i <= 9; i++) {
-            int inputSlot = i + 31; // Crafting grid slots in bedrock
+            final int inputSlot = i + 31; // Crafting grid slots in bedrock
             BedrockItem item = this.getItem(inputSlot);
             if (!item.isEmpty() && item.amount() > 0) {
-                int toConsume = Math.min(item.amount(), craftableAmount);
+                final int toConsume = Math.min(item.amount(), craftableAmount);
                 item = item.copy();
                 item.setAmount(item.amount() - toConsume);
                 if (item.amount() > 0) {
@@ -220,4 +219,5 @@ public class CraftingTableContainer extends Container {
         //TODO: Re-Update the output slot based on remaining items in the crafting grid
         return true;
     }
+
 }

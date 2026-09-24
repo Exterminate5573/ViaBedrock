@@ -52,12 +52,12 @@ public class SmithingContainer extends Container {
     public static final int MATERIAL_SLOT = 52;
     public static final int TEMPLATE_SLOT = 53;
 
-    public SmithingContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public SmithingContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.SMITHING_TABLE, title, position, 4, CustomBlockTags.SMITHING_TABLE);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case TEMPLATE_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableTemplateContainer, null);
             case INPUT_SLOT -> new FullContainerName(ContainerEnumName.SmithingTableInputContainer, null);
@@ -90,7 +90,7 @@ public class SmithingContainer extends Container {
     }
 
     @Override
-    public BedrockItem getItem(int bedrockSlot) {
+    public BedrockItem getItem(final int bedrockSlot) {
         return switch (bedrockSlot) {
             case TEMPLATE_SLOT -> this.items[0];
             case INPUT_SLOT -> this.items[1];
@@ -112,23 +112,18 @@ public class SmithingContainer extends Container {
     }
 
     @Override
-    public boolean handleClick(int revision, short javaSlot, byte button, ContainerInput action) {
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         boolean result = false;
         if (javaSlot != 3) {
             // Handle click first so we update the crafting grid before checking for a recipe
             result = super.handleClick(revision, javaSlot, button, action);
         }
 
-        ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-        CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
+        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+        final CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
         final CraftingDataStorage craftingDataStorage = tracker.getRecipeData(this, "smithing_table");
-        BedrockItem resultItem = BedrockItem.empty();
-        if (craftingDataStorage != null) {
-
-        }
-
-        //this.setItem(0, resultItem);
-        PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
+        final BedrockItem resultItem = BedrockItem.empty();
+        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
         containerSlot.write(Types.VAR_INT, (int) this.containerId());
         containerSlot.write(Types.VAR_INT, revision);
         containerSlot.write(Types.SHORT, (short) 3); // Output slot
@@ -145,17 +140,17 @@ public class SmithingContainer extends Container {
             return result;
         }
 
-        InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
 
-        List<Container> prevContainers = new ArrayList<>();
+        final List<Container> prevContainers = new ArrayList<>();
         prevContainers.add(this.copy());
         prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-        Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
+        final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-        int bedrockSlot = this.bedrockSlot(javaSlot);
+        final int bedrockSlot = this.bedrockSlot(javaSlot);
 
-        List<ItemStackRequestAction> actions = new ArrayList<>();
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
         actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), 1));
         actions.add(new ItemStackRequestAction.ConsumeAction(
                 1,
@@ -182,7 +177,7 @@ public class SmithingContainer extends Container {
                 )
         ));
 
-        int nextRequestId = inventoryRequestTracker.nextRequestId();
+        final int nextRequestId = inventoryRequestTracker.nextRequestId();
 
         actions.add(
                 new ItemStackRequestAction.TakeAction(
@@ -200,7 +195,7 @@ public class SmithingContainer extends Container {
                 )
         );
 
-        ItemStackRequestInfo request = new ItemStackRequestInfo(
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(
                 nextRequestId,
                 actions,
                 List.of(),

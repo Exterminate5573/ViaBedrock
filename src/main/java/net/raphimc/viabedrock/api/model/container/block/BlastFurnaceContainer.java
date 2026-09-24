@@ -28,12 +28,12 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class BlastFurnaceContainer extends FurnaceContainer {
 
-    public BlastFurnaceContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public BlastFurnaceContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.BLAST_FURNACE, title, position, CustomBlockTags.BLAST_FURNACE);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         if (slot == 0) {
             return new FullContainerName(ContainerEnumName.BlastFurnaceIngredientContainer, null);
         } else {

@@ -26,7 +26,7 @@ public class InventoryRequestTracker extends StoredObject {
     Int2ObjectOpenHashMap<InventoryRequestStorage> requests = new Int2ObjectOpenHashMap<>();
     int requestIdCounter = -1;
 
-    public InventoryRequestTracker(UserConnection user) {
+    public InventoryRequestTracker(final UserConnection user) {
         super(user);
     }
 
@@ -34,15 +34,15 @@ public class InventoryRequestTracker extends StoredObject {
         return this.requestIdCounter -= 2; // Bedrock seems to use negative odd numbers for request IDs
     }
 
-    public void addRequest(InventoryRequestStorage info) {
+    public void addRequest(final InventoryRequestStorage info) {
         this.requests.put(info.requestInfo().requestId(), info);
     }
 
-    public InventoryRequestStorage getRequest(int requestId) {
+    public InventoryRequestStorage getRequest(final int requestId) {
         return this.requests.get(requestId);
     }
 
-    public void removeRequest(int requestId) {
+    public void removeRequest(final int requestId) {
         this.requests.remove(requestId);
     }
 

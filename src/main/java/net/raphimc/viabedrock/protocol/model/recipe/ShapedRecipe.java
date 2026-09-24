@@ -33,7 +33,7 @@ public class ShapedRecipe extends Recipe {
     private final List<BedrockItem> results;
     private final boolean mirrored;
 
-    public ShapedRecipe(String uniqueId, UUID recipeId, String recipeTag, int priority, ItemDescriptor[][] pattern, List<BedrockItem> results, boolean mirrored) {
+    public ShapedRecipe(final String uniqueId, final UUID recipeId, final String recipeTag, final int priority, final ItemDescriptor[][] pattern, final List<BedrockItem> results, final boolean mirrored) {
         super(uniqueId, recipeId, recipeTag, priority);
         this.pattern = pattern;
         this.results = results;
@@ -41,39 +41,39 @@ public class ShapedRecipe extends Recipe {
     }
 
     public ItemDescriptor[][] getPattern() {
-        return pattern;
+        return this.pattern;
     }
 
     public List<BedrockItem> getResults() {
-        return results;
+        return this.results;
     }
 
     public boolean isMirrored() {
-        return mirrored;
+        return this.mirrored;
     }
 
     @Override
     public void writeJavaRecipeData(final PacketWrapper packet, final UserConnection user) {
         packet.write(Types.VAR_INT, 1); // Shaped recipe type
-        packet.write(Types.VAR_INT, pattern[0].length); // Width
-        packet.write(Types.VAR_INT, pattern.length); // Height
-        packet.write(Types.VAR_INT, pattern[0].length * pattern.length); // Number of ingredients
-        for (ItemDescriptor[] row : pattern) {
+        packet.write(Types.VAR_INT, this.pattern[0].length); // Width
+        packet.write(Types.VAR_INT, this.pattern.length); // Height
+        packet.write(Types.VAR_INT, this.pattern[0].length * this.pattern.length); // Number of ingredients
+        for (ItemDescriptor[] row : this.pattern) {
             for (ItemDescriptor descriptor : row) {
                 descriptor.writeJavaIngredientData(packet, user);
             }
         }
-        new ItemDescriptor.DefaultDescriptor(results.get(0).identifier(), results.get(0).auxValue()).writeJavaIngredientData(packet, user);
+        new ItemDescriptor.DefaultDescriptor(this.results.get(0).identifier(), this.results.get(0).auxValue()).writeJavaIngredientData(packet, user);
         new ItemDescriptor.InvalidDescriptor().writeJavaIngredientData(packet, user); //TODO: Crafting Station
     }
 
     @Override
     public String toString() {
-        return "ShapedRecipe{" +
-                "pattern=" + Arrays.deepToString(pattern) +
-                ", results=" + results +
-                ", mirrored=" + mirrored +
-                "} " + super.toString();
+        return "ShapedRecipe{"
+                + "pattern=" + Arrays.deepToString(this.pattern)
+                + ", results=" + this.results
+                + ", mirrored=" + this.mirrored
+                + "} " + super.toString();
     }
 
 }

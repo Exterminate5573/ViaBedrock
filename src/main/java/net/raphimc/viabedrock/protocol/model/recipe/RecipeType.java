@@ -21,6 +21,7 @@ import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectMap;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap;
 
 public enum RecipeType {
+
     SHAPELESS(0),
     SHAPED(1),
     UNKNOWN_1(2),
@@ -33,6 +34,8 @@ public enum RecipeType {
     SMITHING_TRIM(9);
 
     private static final Int2ObjectMap<RecipeType> BY_VALUE = new Int2ObjectOpenHashMap<>();
+
+    private final int value;
 
     static {
         for (RecipeType value : values()) {
@@ -67,8 +70,6 @@ public enum RecipeType {
         }
         return fallback;
     }
-
-    private final int value;
 
     RecipeType(final RecipeType value) {
         this(value.value);

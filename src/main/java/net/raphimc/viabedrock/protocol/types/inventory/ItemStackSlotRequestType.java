@@ -30,18 +30,19 @@ public class ItemStackSlotRequestType extends Type<ItemStackRequestSlotInfo> {
     }
 
     @Override
-    public ItemStackRequestSlotInfo read(ByteBuf buffer) {
-        FullContainerName container = BedrockTypes.FULL_CONTAINER_NAME.read(buffer);
-        byte slot = buffer.readByte();
-        int stackNetworkId = BedrockTypes.VAR_INT.read(buffer);
+    public ItemStackRequestSlotInfo read(final ByteBuf buffer) {
+        final FullContainerName container = BedrockTypes.FULL_CONTAINER_NAME.read(buffer);
+        final byte slot = buffer.readByte();
+        final int stackNetworkId = BedrockTypes.VAR_INT.read(buffer);
 
         return new ItemStackRequestSlotInfo(container, slot, stackNetworkId);
     }
 
     @Override
-    public void write(ByteBuf buffer, ItemStackRequestSlotInfo value) {
+    public void write(final ByteBuf buffer, final ItemStackRequestSlotInfo value) {
         BedrockTypes.FULL_CONTAINER_NAME.write(buffer, value.container());
         buffer.writeByte(value.slot());
         BedrockTypes.VAR_INT.write(buffer, value.stackNetworkId());
     }
+
 }

@@ -18,7 +18,7 @@
 package net.raphimc.viabedrock.api.model.container.block;
 
 import com.viaversion.nbt.tag.CompoundTag;
-import com.viaversion.nbt.tag.ShortTag;
+
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
@@ -50,12 +50,12 @@ public class EnchantmentContainer extends Container {
 
     List<EnchantData> data = new ArrayList<>();
 
-    public EnchantmentContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public EnchantmentContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.ENCHANTMENT, title, position, 2, CustomBlockTags.ENCHANTING_TABLE);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case 14 -> new FullContainerName(ContainerEnumName.EnchantingInputContainer, null);
             case 15 -> new FullContainerName(ContainerEnumName.EnchantingMaterialContainer, null);
@@ -101,24 +101,24 @@ public class EnchantmentContainer extends Container {
             return false;
         }
 
-        InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-        EntityTracker entityTracker  = user.get(EntityTracker.class);
+        final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
+        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+        final EntityTracker entityTracker = user.get(EntityTracker.class);
 
         final List<Container> prevContainers = new ArrayList<>();
         final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
         prevContainers.add(this.copy());
 
-        int reqId = inventoryRequestTracker.nextRequestId();
+        final int reqId = inventoryRequestTracker.nextRequestId();
 
-        List<ItemStackRequestAction> actions = new ArrayList<>();
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
 
-        ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(this.data.get(button).netId(), 1);
-        ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
+        final ItemStackRequestAction craftAction = new ItemStackRequestAction.CraftRecipeAction(this.data.get(button).netId(), 1);
+        final ItemStackRequestAction consumeAction = new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
                 this.getFullContainerName(14), (byte) 14, this.getItem(14).netId()
         ));
-        ItemStackRequestAction placeAction = new ItemStackRequestAction.PlaceAction(1,
+        final ItemStackRequestAction placeAction = new ItemStackRequestAction.PlaceAction(1,
                 new ItemStackRequestSlotInfo(
                         new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, reqId
                 ),
@@ -131,7 +131,7 @@ public class EnchantmentContainer extends Container {
         actions.add(placeAction);
 
         if (entityTracker.getClientPlayer().gameType() == GameType.Survival || entityTracker.getClientPlayer().gameType() == GameType.Adventure) {
-            ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(button + 1, new ItemStackRequestSlotInfo(
+            final ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(button + 1, new ItemStackRequestSlotInfo(
                     this.getFullContainerName(15), (byte) 15, this.getItem(15).netId()
             ));
             actions.add(consumeAction2);
@@ -139,18 +139,7 @@ public class EnchantmentContainer extends Container {
             this.setItem(15, this.itemAfterRemovingAmount(this.getItem(15), button + 1));
         }
 
-        /* FIXME
-        BedrockItem item = this.getItem(14).copy();
-        CompoundTag tag = item.tag() != null ? item.tag().copy() : new CompoundTag();
-        CompoundTag enchant = new CompoundTag();
-        enchant.put("id", new ShortTag((short) this.data.get(button).type().getValue()));
-        enchant.put("lvl", new ShortTag((short) this.data.get(button).level()));
-        tag.put("ench", enchant);
-        item.setTag(tag);
-        this.setItem(14, item);
-        */
-
-        ItemStackRequestInfo request = new ItemStackRequestInfo(
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(
                 reqId,
                 actions,
                 List.of(),
@@ -163,23 +152,23 @@ public class EnchantmentContainer extends Container {
         return true;
     }
 
-    public void setEnchantData(List<EnchantData> data) {
+    public void setEnchantData(final List<EnchantData> data) {
         this.data = data;
 
         // Send to java client
         for (int i = 0; i < Math.min(this.data.size(), 3); i++) {
-            EnchantData d = this.data.get(i);
+            final EnchantData d = this.data.get(i);
             PacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) d.cost());
 
-            String javaEnchant = BedrockProtocol.MAPPINGS.getBedrockToJavaEnchantments().get(d.type());
+            final String javaEnchant = BedrockProtocol.MAPPINGS.getBedrockToJavaEnchantments().get(d.type());
             // Update the java item with the enchantment
             if (javaEnchant != null) {
-                CompoundTag enchantmentsRegistry = (CompoundTag) BedrockProtocol.MAPPINGS.getJavaRegistries().get("minecraft:enchantment");
-                CompoundTag enchantmentEntry = (CompoundTag) enchantmentsRegistry.get(javaEnchant);
+                final CompoundTag enchantmentsRegistry = (CompoundTag) BedrockProtocol.MAPPINGS.getJavaRegistries().get("minecraft:enchantment");
+                final CompoundTag enchantmentEntry = (CompoundTag) enchantmentsRegistry.get(javaEnchant);
                 if (enchantmentEntry == null) {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Enchantment entry is null for enchantment " + javaEnchant);
                 } else {
-                    int javaId = RegistryUtil.getRegistryIndex(enchantmentsRegistry, enchantmentEntry);
+                    final int javaId = RegistryUtil.getRegistryIndex(enchantmentsRegistry, enchantmentEntry);
                     PacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 4), (short) javaId);
                 }
             } else {

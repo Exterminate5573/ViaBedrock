@@ -48,21 +48,21 @@ import java.util.List;
 
 public class BeaconContainer extends Container {
 
-    public BeaconContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public BeaconContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.BEACON, title, position, 1, CustomBlockTags.BEACON);
 
-        PacketWrapper propertiesPacket = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
+        final PacketWrapper propertiesPacket = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
         propertiesPacket.write(Types.VAR_INT, (int) containerId);
         propertiesPacket.write(Types.SHORT, (short) 0); // Property ID (Power level)
         // TODO: Dynamically set this based on the beacon's current level
         propertiesPacket.write(Types.SHORT, (short) 4); // Property Value (0-4)
         propertiesPacket.scheduleSend(BedrockProtocol.class);
 
-        ChunkTracker chunkTracker = user.get(ChunkTracker.class);
-        BedrockBlockEntity bedrockBlockEntity = chunkTracker.getBlockEntity(position);
+        final ChunkTracker chunkTracker = user.get(ChunkTracker.class);
+        final BedrockBlockEntity bedrockBlockEntity = chunkTracker.getBlockEntity(position);
         if (bedrockBlockEntity != null) {
-            int primaryEffect = bedrockBlockEntity.tag().getInt("primary", 0);
-            int secondaryEffect = bedrockBlockEntity.tag().getInt("secondary", 0);
+            final int primaryEffect = bedrockBlockEntity.tag().getInt("primary", 0);
+            final int secondaryEffect = bedrockBlockEntity.tag().getInt("secondary", 0);
 
             //TODO: This is kinda cooked, refactor later
             final String bedrockIdentifierPrimary = BedrockProtocol.MAPPINGS.getBedrockEffects().inverse().get(primaryEffect);
@@ -76,13 +76,13 @@ public class BeaconContainer extends Container {
 
             ViaBedrock.getPlatform().getLogger().info("Beacon effects - Primary: " + javaIdPrimary + " Secondary: " + javaIdSecondary);
 
-            PacketWrapper propertiesPacket2 = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
+            final PacketWrapper propertiesPacket2 = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
             propertiesPacket2.write(Types.VAR_INT, (int) containerId);
             propertiesPacket2.write(Types.SHORT, (short) 1); // Property ID (First potion effect )
             propertiesPacket2.write(Types.SHORT, (short) javaIdPrimary); // Property Value
             propertiesPacket2.scheduleSend(BedrockProtocol.class);
 
-            PacketWrapper propertiesPacket3 = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
+            final PacketWrapper propertiesPacket3 = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
             propertiesPacket3.write(Types.VAR_INT, (int) containerId);
             propertiesPacket3.write(Types.SHORT, (short) 2); // Property ID (Second potion effect )
             propertiesPacket3.write(Types.SHORT, (short) javaIdSecondary); // Property Value
@@ -91,7 +91,7 @@ public class BeaconContainer extends Container {
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         if (slot != 27) {
             throw new IllegalArgumentException("Invalid slot for Beacon Container: " + slot);
         }
@@ -129,9 +129,9 @@ public class BeaconContainer extends Container {
         return super.setItem(bedrockSlot - 27, item);
     }
 
-    public void updateEffects(int primaryEffect, int secondaryEffect) {
-        InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
-        InventoryTracker inventoryTracker = this.user.get(InventoryTracker.class);
+    public void updateEffects(final int primaryEffect, final int secondaryEffect) {
+        final InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
+        final InventoryTracker inventoryTracker = this.user.get(InventoryTracker.class);
 
         //TODO: This is kinda cooked, refactor later
         final String javaIdentifierPrimary = BedrockProtocol.MAPPINGS.getJavaEffects().inverse().get(primaryEffect);
@@ -145,7 +145,7 @@ public class BeaconContainer extends Container {
 
         final BedrockItem paymentItem = this.getItem(27);
 
-        ItemStackRequestInfo requestInfo = new ItemStackRequestInfo(
+        final ItemStackRequestInfo requestInfo = new ItemStackRequestInfo(
                 inventoryRequestTracker.nextRequestId(),
                 List.of(
                         new ItemStackRequestAction.BeaconPaymentAction(
@@ -165,9 +165,9 @@ public class BeaconContainer extends Container {
                 TextProcessingEventOrigin.unknown
         );
 
-        List<Container> prevContainers = new ArrayList<>();
+        final List<Container> prevContainers = new ArrayList<>();
         prevContainers.add(this.copy());
-        Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
+        final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
         this.setItem(27, this.itemAfterRemovingAmount(paymentItem, 1)); // Clear the payment slot
 

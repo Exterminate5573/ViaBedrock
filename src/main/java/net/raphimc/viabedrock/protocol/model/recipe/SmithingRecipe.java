@@ -32,7 +32,7 @@ public class SmithingRecipe extends Recipe {
     private final ItemDescriptor additionIngredient;
     private final BedrockItem result;
 
-    public SmithingRecipe(String uniqueId, UUID recipeId, String recipeTag, int priority, ItemDescriptor template, ItemDescriptor baseIngredient, ItemDescriptor additionIngredient, BedrockItem result) {
+    public SmithingRecipe(final String uniqueId, final UUID recipeId, final String recipeTag, final int priority, final ItemDescriptor template, final ItemDescriptor baseIngredient, final ItemDescriptor additionIngredient, final BedrockItem result) {
         super(uniqueId, recipeId, recipeTag, priority);
         this.template = template;
         this.baseIngredient = baseIngredient;
@@ -43,37 +43,37 @@ public class SmithingRecipe extends Recipe {
     @Override
     public void writeJavaRecipeData(final PacketWrapper packet, final UserConnection user) {
         packet.write(Types.VAR_INT, 4); // Smithing recipe type
-        template.writeJavaIngredientData(packet, user);
-        baseIngredient.writeJavaIngredientData(packet, user);
-        additionIngredient.writeJavaIngredientData(packet, user);
-        new ItemDescriptor.DefaultDescriptor(result.identifier(), result.auxValue()).writeJavaIngredientData(packet, user);
+        this.template.writeJavaIngredientData(packet, user);
+        this.baseIngredient.writeJavaIngredientData(packet, user);
+        this.additionIngredient.writeJavaIngredientData(packet, user);
+        new ItemDescriptor.DefaultDescriptor(this.result.identifier(), this.result.auxValue()).writeJavaIngredientData(packet, user);
         new ItemDescriptor.InvalidDescriptor().writeJavaIngredientData(packet, user); //TODO: Crafting Station
     }
 
     @Override
     public String toString() {
-        return "SmithingRecipe{" +
-                "template=" + template +
-                ", baseIngredient=" + baseIngredient +
-                ", additionIngredient=" + additionIngredient +
-                ", result=" + result +
-                "} " + super.toString();
+        return "SmithingRecipe{"
+                + "template=" + this.template
+                + ", baseIngredient=" + this.baseIngredient
+                + ", additionIngredient=" + this.additionIngredient
+                + ", result=" + this.result
+                + "} " + super.toString();
     }
 
-    public  ItemDescriptor getTemplate() {
-        return template;
+    public ItemDescriptor getTemplate() {
+        return this.template;
     }
 
-    public  ItemDescriptor getBaseIngredient() {
-        return baseIngredient;
+    public ItemDescriptor getBaseIngredient() {
+        return this.baseIngredient;
     }
 
-    public  ItemDescriptor getAdditionIngredient() {
-        return additionIngredient;
+    public ItemDescriptor getAdditionIngredient() {
+        return this.additionIngredient;
     }
 
-    public  BedrockItem getResult() {
-        return result;
+    public BedrockItem getResult() {
+        return this.result;
     }
 
 }

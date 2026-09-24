@@ -23,12 +23,14 @@ import net.raphimc.viabedrock.protocol.model.recipe.Recipe;
 import net.raphimc.viabedrock.protocol.model.recipe.RecipeType;
 
 public record CraftingDataStorage(RecipeType type, int networkId, Recipe recipe) {
+
     @Override
     public @NonNull String toString() {
-        return "CraftingDataStorage{" +
-                "type=" + type +
-                ", networkId=" + networkId +
-                ", recipe=" + recipe.toString() +
-                '}';
+        return "CraftingDataStorage{"
+                + "type=" + this.type
+                + ", networkId=" + this.networkId
+                + ", recipe=" + this.recipe.toString()
+                + '}';
     }
+
 }

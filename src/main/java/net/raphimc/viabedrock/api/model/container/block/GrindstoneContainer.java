@@ -30,12 +30,12 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class GrindstoneContainer extends Container {
 
-    public GrindstoneContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public GrindstoneContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.GRINDSTONE, title, position, 3, CustomBlockTags.GRINDSTONE);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case 16 -> new FullContainerName(ContainerEnumName.GrindstoneInputContainer, null);
             case 17 -> new FullContainerName(ContainerEnumName.GrindstoneAdditionalContainer, null);
@@ -65,7 +65,7 @@ public class GrindstoneContainer extends Container {
     }
 
     @Override
-    public BedrockItem getItem(int bedrockSlot) {
+    public BedrockItem getItem(final int bedrockSlot) {
         // Fix magic offset
         return switch (bedrockSlot) {
             case 50 -> super.getItem(2);

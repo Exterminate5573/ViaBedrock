@@ -34,7 +34,8 @@ public class HopperContainer extends Container {
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return new FullContainerName(ContainerEnumName.LevelEntityContainer, null);
     }
+
 }

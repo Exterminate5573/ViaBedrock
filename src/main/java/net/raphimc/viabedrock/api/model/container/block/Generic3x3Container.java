@@ -29,12 +29,13 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class Generic3x3Container extends Container {
 
-    public Generic3x3Container(UserConnection user, byte containerId, ContainerType type, TextComponent title, BlockPosition position) {
+    public Generic3x3Container(final UserConnection user, final byte containerId, final ContainerType type, final TextComponent title, final BlockPosition position) {
         super(user, containerId, type, title, position, 9, CustomBlockTags.DISPENSER, CustomBlockTags.DROPPER);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return new FullContainerName(ContainerEnumName.LevelEntityContainer, null);
     }
+
 }

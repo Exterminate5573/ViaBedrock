@@ -32,7 +32,7 @@ public class HudContainer extends InventoryRedirectContainer {
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         // TODO: Crafting output slot
         if (slot == 0) {
             return new FullContainerName(ContainerEnumName.CursorContainer, null);

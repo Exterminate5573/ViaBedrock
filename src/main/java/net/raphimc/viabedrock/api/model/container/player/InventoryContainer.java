@@ -53,7 +53,7 @@ public class InventoryContainer extends Container {
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         if (slot < 9) {
             return new FullContainerName(ContainerEnumName.HotbarContainer, null);
         }

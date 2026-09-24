@@ -32,72 +32,72 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
     }
 
     @Override
-    public ItemStackRequestAction read(ByteBuf buffer) {
+    public ItemStackRequestAction read(final ByteBuf buffer) {
         return null;
     }
 
     @Override
-    public void write(ByteBuf buffer, ItemStackRequestAction value) {
+    public void write(final ByteBuf buffer, final ItemStackRequestAction value) {
         buffer.writeByte(value.getType().getValue());
         switch (value.getType()) {
             case Take -> {
-                ItemStackRequestAction.TakeAction takeAction = (ItemStackRequestAction.TakeAction) value;
+                final ItemStackRequestAction.TakeAction takeAction = (ItemStackRequestAction.TakeAction) value;
 
                 buffer.writeByte(takeAction.count());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, takeAction.source());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, takeAction.destination());
             }
             case Place -> {
-                ItemStackRequestAction.PlaceAction placeAction = (ItemStackRequestAction.PlaceAction) value;
+                final ItemStackRequestAction.PlaceAction placeAction = (ItemStackRequestAction.PlaceAction) value;
 
                 buffer.writeByte(placeAction.count());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, placeAction.source());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, placeAction.destination());
             }
             case Swap -> {
-                ItemStackRequestAction.SwapAction swapAction = (ItemStackRequestAction.SwapAction) value;
+                final ItemStackRequestAction.SwapAction swapAction = (ItemStackRequestAction.SwapAction) value;
 
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, swapAction.source());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, swapAction.destination());
             }
             case Drop -> {
-                ItemStackRequestAction.DropAction dropAction = (ItemStackRequestAction.DropAction) value;
+                final ItemStackRequestAction.DropAction dropAction = (ItemStackRequestAction.DropAction) value;
 
                 buffer.writeByte(dropAction.count());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, dropAction.item());
                 buffer.writeBoolean(dropAction.randomly());
             }
             case Destroy -> {
-                ItemStackRequestAction.DestroyAction destroyAction = (ItemStackRequestAction.DestroyAction) value;
+                final ItemStackRequestAction.DestroyAction destroyAction = (ItemStackRequestAction.DestroyAction) value;
 
                 buffer.writeByte(destroyAction.count());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, destroyAction.item());
             }
             case Consume -> {
-                ItemStackRequestAction.ConsumeAction consumeAction = (ItemStackRequestAction.ConsumeAction) value;
+                final ItemStackRequestAction.ConsumeAction consumeAction = (ItemStackRequestAction.ConsumeAction) value;
 
                 buffer.writeByte(consumeAction.count());
                 InventoryTypes.ITEM_STACK_REQUEST_SLOT.write(buffer, consumeAction.item());
             }
             case Create -> {
-                ItemStackRequestAction.CreateAction createAction = (ItemStackRequestAction.CreateAction) value;
+                final ItemStackRequestAction.CreateAction createAction = (ItemStackRequestAction.CreateAction) value;
 
                 buffer.writeByte(createAction.slot());
             }
             case ScreenBeaconPayment -> {
-                ItemStackRequestAction.BeaconPaymentAction screenBeaconPaymentAction = (ItemStackRequestAction.BeaconPaymentAction) value;
+                final ItemStackRequestAction.BeaconPaymentAction screenBeaconPaymentAction = (ItemStackRequestAction.BeaconPaymentAction) value;
 
                 BedrockTypes.VAR_INT.write(buffer, screenBeaconPaymentAction.primaryEvent());
                 BedrockTypes.VAR_INT.write(buffer, screenBeaconPaymentAction.secondaryEvent());
             }
             case CraftRecipe -> {
-                ItemStackRequestAction.CraftRecipeAction craftRecipeAction = (ItemStackRequestAction.CraftRecipeAction) value;
+                final ItemStackRequestAction.CraftRecipeAction craftRecipeAction = (ItemStackRequestAction.CraftRecipeAction) value;
 
                 BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftRecipeAction.recipeNetworkId());
                 buffer.writeByte(craftRecipeAction.numberOfRequestedCrafts());
             }
             case CraftRecipeAuto -> {
-                ItemStackRequestAction.AutoCraftRecipeAction craftRecipeAutoAction = (ItemStackRequestAction.AutoCraftRecipeAction) value;
+                final ItemStackRequestAction.AutoCraftRecipeAction craftRecipeAutoAction = (ItemStackRequestAction.AutoCraftRecipeAction) value;
 
                 BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftRecipeAutoAction.recipeNetworkId());
                 buffer.writeByte(craftRecipeAutoAction.numberOfRequestedCrafts());
@@ -105,40 +105,41 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
                 BedrockTypes.ITEM_ENTRY_ARRAY.write(buffer, craftRecipeAutoAction.ingredients().toArray(new ItemEntry[0]));
             }
             case CraftCreative -> {
-                ItemStackRequestAction.CraftCreativeAction craftCreativeAction = (ItemStackRequestAction.CraftCreativeAction) value;
+                final ItemStackRequestAction.CraftCreativeAction craftCreativeAction = (ItemStackRequestAction.CraftCreativeAction) value;
 
                 BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftCreativeAction.creativeItemNetworkId());
                 buffer.writeByte(craftCreativeAction.numberOfRequestedCrafts());
             }
             case CraftRecipeOptional -> {
-                ItemStackRequestAction.CraftRecipeOptionalAction craftRecipeOptionalAction = (ItemStackRequestAction.CraftRecipeOptionalAction) value;
+                final ItemStackRequestAction.CraftRecipeOptionalAction craftRecipeOptionalAction = (ItemStackRequestAction.CraftRecipeOptionalAction) value;
 
                 BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftRecipeOptionalAction.recipeNetworkId());
                 BedrockTypes.INT_LE.write(buffer, craftRecipeOptionalAction.filteredStringIndex());
             }
             case ScreenHUDMineBlock -> {
-                ItemStackRequestAction.MineBlockAction hudMineBlockAction = (ItemStackRequestAction.MineBlockAction) value;
+                final ItemStackRequestAction.MineBlockAction hudMineBlockAction = (ItemStackRequestAction.MineBlockAction) value;
 
                 BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.hotbarSlot());
                 BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.predictedDurability());
                 BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.stackNetworkId());
             }
             case CraftRepairAndDisenchant -> {
-                ItemStackRequestAction.CraftGrindstoneAction craftGrindstoneAction = (ItemStackRequestAction.CraftGrindstoneAction) value;
+                final ItemStackRequestAction.CraftGrindstoneAction craftGrindstoneAction = (ItemStackRequestAction.CraftGrindstoneAction) value;
 
                 BedrockTypes.UNSIGNED_VAR_INT.write(buffer, craftGrindstoneAction.recipeNetworkId());
                 buffer.writeByte(craftGrindstoneAction.numberOfRequestedCrafts());
                 BedrockTypes.VAR_INT.write(buffer, craftGrindstoneAction.repairCost());
             }
             case CraftLoom -> {
-                ItemStackRequestAction.CraftLoomAction craftLoomAction = (ItemStackRequestAction.CraftLoomAction) value;
+                final ItemStackRequestAction.CraftLoomAction craftLoomAction = (ItemStackRequestAction.CraftLoomAction) value;
 
                 BedrockTypes.STRING.write(buffer, craftLoomAction.patternId());
                 buffer.writeByte(craftLoomAction.timesCrafted());
             }
-            case CraftNonImplemented -> {}
+            case CraftNonImplemented -> {
+            }
             case CraftResults -> {
-                ItemStackRequestAction.CraftResultsDeprecatedAction craftResultsAction = (ItemStackRequestAction.CraftResultsDeprecatedAction) value;
+                final ItemStackRequestAction.CraftResultsDeprecatedAction craftResultsAction = (ItemStackRequestAction.CraftResultsDeprecatedAction) value;
 
                 BedrockTypes.ITEM_ENTRY_ARRAY.write(buffer, craftResultsAction.resultItems().toArray(new ItemEntry[0]));
                 buffer.writeByte(craftResultsAction.timesCrafted());
@@ -146,4 +147,5 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
 
         }
     }
+
 }

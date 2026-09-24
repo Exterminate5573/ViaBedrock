@@ -39,7 +39,7 @@ public class OffhandContainer extends InventorySubContainer {
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return new FullContainerName(ContainerEnumName.OffhandContainer, null);
     }
 

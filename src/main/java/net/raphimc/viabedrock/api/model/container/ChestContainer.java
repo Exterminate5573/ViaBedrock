@@ -37,19 +37,19 @@ public class ChestContainer extends Container {
         super(user, containerId, ContainerType.CONTAINER, title, position, size, CustomBlockTags.CHEST, CustomBlockTags.TRAPPED_CHEST, CustomBlockTags.BARREL, CustomBlockTags.SHULKER_BOX, CustomBlockTags.ENDER_CHEST);
 
         // TODO: Is there a better way to do this
-        ChunkTracker tracker = user.get(ChunkTracker.class);
-        BlockStateRewriter blockStateRewriter = user.get(BlockStateRewriter.class);
-        int blockState = tracker.getBlockState(position);
-        String tag = blockStateRewriter.tag(blockState);
+        final ChunkTracker tracker = user.get(ChunkTracker.class);
+        final BlockStateRewriter blockStateRewriter = user.get(BlockStateRewriter.class);
+        final int blockState = tracker.getBlockState(position);
+        final String tag = blockStateRewriter.tag(blockState);
         this.isBarrel = CustomBlockTags.BARREL.equals(tag);
         this.isShulkerBox = CustomBlockTags.SHULKER_BOX.equals(tag);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
-        if (isShulkerBox) {
+    public FullContainerName getFullContainerName(final int slot) {
+        if (this.isShulkerBox) {
             return new FullContainerName(ContainerEnumName.ShulkerBoxContainer, null);
-        } else if (isBarrel) {
+        } else if (this.isBarrel) {
             return new FullContainerName(ContainerEnumName.BarrelContainer, null);
         } else {
             return new FullContainerName(ContainerEnumName.LevelEntityContainer, null);

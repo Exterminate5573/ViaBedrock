@@ -34,18 +34,19 @@ public class ItemStackContainerResponseType extends Type<ItemStackResponseContai
     }
 
     @Override
-    public ItemStackResponseContainerInfo read(ByteBuf buffer) {
-        FullContainerName containerName = BedrockTypes.FULL_CONTAINER_NAME.read(buffer);
+    public ItemStackResponseContainerInfo read(final ByteBuf buffer) {
+        final FullContainerName containerName = BedrockTypes.FULL_CONTAINER_NAME.read(buffer);
 
-        List<ItemStackResponseSlotInfo> slots = List.of(InventoryTypes.ITEM_STACK_RESPONSE_SLOTS.read(buffer));
+        final List<ItemStackResponseSlotInfo> slots = List.of(InventoryTypes.ITEM_STACK_RESPONSE_SLOTS.read(buffer));
 
         return new ItemStackResponseContainerInfo(containerName, slots);
     }
 
     @Override
-    public void write(ByteBuf buffer, ItemStackResponseContainerInfo value) {
+    public void write(final ByteBuf buffer, final ItemStackResponseContainerInfo value) {
         BedrockTypes.FULL_CONTAINER_NAME.write(buffer, value.containerName());
 
         InventoryTypes.ITEM_STACK_RESPONSE_SLOTS.write(buffer, value.slots().toArray(new ItemStackResponseSlotInfo[0]));
     }
+
 }

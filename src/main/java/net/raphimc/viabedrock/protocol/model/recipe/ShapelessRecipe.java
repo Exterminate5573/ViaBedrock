@@ -31,18 +31,18 @@ public class ShapelessRecipe extends Recipe {
     private final List<ItemDescriptor> ingredients;
     private final List<BedrockItem> results;
 
-    public ShapelessRecipe(String uniqueId, UUID recipeId, String recipeTag, int priority, List<ItemDescriptor> ingredients, List<BedrockItem> results) {
+    public ShapelessRecipe(final String uniqueId, final UUID recipeId, final String recipeTag, final int priority, final List<ItemDescriptor> ingredients, final List<BedrockItem> results) {
         super(uniqueId, recipeId, recipeTag, priority);
         this.ingredients = ingredients;
         this.results = results;
     }
 
     public List<ItemDescriptor> getIngredients() {
-        return ingredients;
+        return this.ingredients;
     }
 
     public List<BedrockItem> getResults() {
-        return results;
+        return this.results;
     }
 
     @Override
@@ -52,20 +52,20 @@ public class ShapelessRecipe extends Recipe {
         for (ItemDescriptor ingredient : this.getIngredients()) {
             ingredient.writeJavaIngredientData(packet, user); // Write each ingredient
         }
-        new ItemDescriptor.DefaultDescriptor(results.get(0).identifier(), results.get(0).auxValue()).writeJavaIngredientData(packet, user);
+        new ItemDescriptor.DefaultDescriptor(this.results.get(0).identifier(), this.results.get(0).auxValue()).writeJavaIngredientData(packet, user);
         new ItemDescriptor.InvalidDescriptor().writeJavaIngredientData(packet, user); //TODO: Crafting Station
     }
 
     @Override
     public String toString() {
-        return "ShapelessRecipe{" +
-                "uniqueId='" + getUniqueId() + '\'' +
-                ", recipeId=" + getRecipeId() +
-                ", recipeTag='" + getRecipeTag() + '\'' +
-                ", priority=" + getPriority() +
-                ", ingredients=" + ingredients +
-                ", results=" + results +
-                '}';
+        return "ShapelessRecipe{"
+                + "uniqueId='" + getUniqueId() + '\''
+                + ", recipeId=" + getRecipeId()
+                + ", recipeTag='" + getRecipeTag() + '\''
+                + ", priority=" + getPriority()
+                + ", ingredients=" + this.ingredients
+                + ", results=" + this.results
+                + '}';
     }
 
 }

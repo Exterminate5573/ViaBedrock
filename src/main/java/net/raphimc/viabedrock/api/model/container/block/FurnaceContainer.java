@@ -29,16 +29,16 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class FurnaceContainer extends Container {
 
-    public FurnaceContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public FurnaceContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.FURNACE, title, position, 3, CustomBlockTags.FURNACE);
     }
 
-    public FurnaceContainer(UserConnection user, byte containerId, ContainerType type, TextComponent title, BlockPosition position, String... validBlockTags) {
+    public FurnaceContainer(final UserConnection user, final byte containerId, final ContainerType type, final TextComponent title, final BlockPosition position, final String... validBlockTags) {
         super(user, containerId, type, title, position, 3, validBlockTags);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case 0 -> new FullContainerName(ContainerEnumName.FurnaceIngredientContainer, null);
             case 1 -> new FullContainerName(ContainerEnumName.FurnaceFuelContainer, null);
@@ -48,12 +48,7 @@ public class FurnaceContainer extends Container {
     }
 
     @Override
-    public short translateContainerData(int containerData) {
-        /*if (javaId == 3) { // TODO: Handle this properly
-            //TODO: This doesnt seem to be sent by bedrock except once at the start of opening the furnace
-            value = 200; // Java furnace progress max is always 200 ticks (Bedrock seems to always send 0 here)
-        }*/
-
+    public short translateContainerData(final int containerData) {
         return switch (containerData) {
             case 0 -> 2; // Progress arrow
             case 1 -> 0; // Fuel progress

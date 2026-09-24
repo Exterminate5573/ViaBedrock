@@ -46,7 +46,7 @@ public interface ItemDescriptor {
     }
 
     default void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
-        throw new UnsupportedOperationException("Not implemented for " + getType());
+        throw new UnsupportedOperationException("Not implemented for " + this.getType());
     }
 
     record ComplexAliasDescriptor(String name, int amount) implements ItemDescriptor {
@@ -61,7 +61,7 @@ public interface ItemDescriptor {
         }
 
         @Override
-        public boolean matchesItem(UserConnection user, BedrockItem item) {
+        public boolean matchesItem(final UserConnection user, final BedrockItem item) {
             // TODO
             return false;
         }
@@ -90,17 +90,17 @@ public interface ItemDescriptor {
         }
 
         @Override
-        public boolean matchesItem(UserConnection user, BedrockItem item) {
-            return ((itemId == -1 || itemId == 0) && item.isEmpty())
-                    || (!item.isEmpty() && item.identifier() == itemId && ItemDescriptor.matchesAuxValue(auxValue, item));
+        public boolean matchesItem(final UserConnection user, final BedrockItem item) {
+            return ((this.itemId == -1 || this.itemId == 0) && item.isEmpty())
+                    || (!item.isEmpty() && item.identifier() == this.itemId && ItemDescriptor.matchesAuxValue(this.auxValue, item));
         }
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
-            ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-            Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
+            final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+            final Item javaItem = itemRewriter.javaItem(new BedrockItem(this.itemId));
             if (javaItem == null) {
-                throw new IllegalStateException("Could not find Java item for Bedrock ID: " + itemId);
+                throw new IllegalStateException("Could not find Java item for Bedrock ID: " + this.itemId);
             }
 
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item")); // Slot Display Type
@@ -126,16 +126,16 @@ public interface ItemDescriptor {
         }
 
         @Override
-        public boolean matchesItem(UserConnection user, BedrockItem item) {
+        public boolean matchesItem(final UserConnection user, final BedrockItem item) {
             // TODO
             return false;
         }
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
-            ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-            int itemId = itemRewriter.getItems().get(fullName); //TODO: Check if this is correct
-            Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
+            final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+            final int itemId = itemRewriter.getItems().get(this.fullName); //TODO: Check if this is correct
+            final Item javaItem = itemRewriter.javaItem(new BedrockItem(itemId));
             if (javaItem == null) {
                 throw new IllegalStateException("Could not find Java item for Bedrock ID: " + itemId);
             }
@@ -158,7 +158,7 @@ public interface ItemDescriptor {
         }
 
         @Override
-        public boolean matchesItem(UserConnection user, BedrockItem item) {
+        public boolean matchesItem(final UserConnection user, final BedrockItem item) {
             return item.isEmpty();
         }
 
@@ -186,22 +186,26 @@ public interface ItemDescriptor {
         }
 
         @Override
-        public boolean matchesItem(UserConnection user, BedrockItem item) {
-            if (item.isEmpty()) return false;
-            ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-            String itemName = itemRewriter.getItems().inverse().get(item.identifier());
-            Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(itemName);
+        public boolean matchesItem(final UserConnection user, final BedrockItem item) {
+            if (item.isEmpty()) {
+                return false;
+            }
+            final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
+            final String itemName = itemRewriter.getItems().inverse().get(item.identifier());
+            final Set<String> tags = BedrockProtocol.MAPPINGS.getBedrockItemTags().get(itemName);
 
-            if (tags == null || tags.isEmpty()) return false;
+            if (tags == null || tags.isEmpty()) {
+                return false;
+            }
 
-            return tags.contains(itemTag);
+            return tags.contains(this.itemTag);
         }
 
         @Override
         public void writeJavaIngredientData(final PacketWrapper packet, final UserConnection user) {
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:tag")); // Slot Display Type
             //TODO: Convert to Java Tag properly
-            packet.write(Types.IDENTIFIER, Key.of(itemTag)); // Item Tag
+            packet.write(Types.IDENTIFIER, Key.of(this.itemTag)); // Item Tag
         }
 
         @Override
@@ -223,7 +227,7 @@ public interface ItemDescriptor {
         }
 
         @Override
-        public boolean matchesItem(UserConnection user, BedrockItem item) {
+        public boolean matchesItem(final UserConnection user, final BedrockItem item) {
             // TODO
             return false;
         }

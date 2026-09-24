@@ -77,18 +77,20 @@ public abstract class Container {
     public abstract FullContainerName getFullContainerName(int slot);
 
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        if (javaSlot == -1) return false;
+        if (javaSlot == -1) {
+            return false;
+        }
 
-        InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-        ClickContext clickContext = new ClickContext(this, this.bedrockSlot(javaSlot), inventoryTracker, inventoryRequestTracker);
+        final InventoryTracker inventoryTracker = this.user.get(InventoryTracker.class);
+        final InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
+        final ClickContext clickContext = new ClickContext(this, this.bedrockSlot(javaSlot), inventoryTracker, inventoryRequestTracker);
 
         /* TODO: Could potentially lead to a race condition if we receive a inventory update before the response for the request,
          *  a better solution would be to store the specific changes made in the request. From my testing this doesnt seem to happen though
          */
         clickContext.prevContainers.add(this.copy()); // Store previous state of the container
 
-        List<ItemStackRequestAction> itemActions = switch (action) {
+        final List<ItemStackRequestAction> itemActions = switch (action) {
             case PICKUP -> this.singletonAction(this.handlePickupClick(clickContext, javaSlot, button));
             case SWAP -> this.singletonAction(this.handleSwapClick(clickContext, javaSlot, button));
             case QUICK_MOVE -> this.handleQuickMoveClick(clickContext, javaSlot);
@@ -100,7 +102,7 @@ public abstract class Container {
             return false;
         }
 
-        ItemStackRequestInfo request = new ItemStackRequestInfo(
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(
                 clickContext.inventoryRequestTracker.nextRequestId(),
                 itemActions,
                 List.of(),
@@ -108,7 +110,7 @@ public abstract class Container {
         );
 
         clickContext.inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, clickContext.prevCursorContainer, clickContext.prevContainers)); // Store the request to track it later
-        PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
+        PlayerActionPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[] {request});
 
         return true;
     }
@@ -116,15 +118,15 @@ public abstract class Container {
     private ItemStackRequestAction handlePickupClick(final ClickContext clickContext, final short javaSlot, final byte button) {
         Container container = clickContext.container;
         int bedrockSlot = clickContext.bedrockSlot;
-        BedrockItem cursorItem = clickContext.inventoryTracker.getHudContainer().getItem(0);
+        final BedrockItem cursorItem = clickContext.inventoryTracker.getHudContainer().getItem(0);
 
         if (javaSlot == -999) {
             return this.dropCursorItem(clickContext.inventoryTracker, button);
         }
 
         if (!(container instanceof InventoryContainer) && (javaSlot < 0 || javaSlot >= container.getItems().length)) {
-            Container inventoryContainer = clickContext.inventoryTracker.getInventoryContainer();
-            int invSlot = inventoryContainer.bedrockSlot(javaSlot - container.getItems().length + 9); // Map to inventory slot
+            final Container inventoryContainer = clickContext.inventoryTracker.getInventoryContainer();
+            final int invSlot = inventoryContainer.bedrockSlot(javaSlot - container.getItems().length + 9); // Map to inventory slot
             if (invSlot < 0 || invSlot >= inventoryContainer.getItems().length) {
                 ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle click for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
                 return null;
@@ -139,8 +141,8 @@ public abstract class Container {
 
         if (container instanceof InventoryContainer) {
             if (javaSlot >= 0 && javaSlot < 5) {
-                Container hudContainer = clickContext.inventoryTracker.getHudContainer();
-                int hudSlot  = hudContainer.bedrockSlot(javaSlot);
+                final Container hudContainer = clickContext.inventoryTracker.getHudContainer();
+                final int hudSlot = hudContainer.bedrockSlot(javaSlot);
 
                 bedrockSlot = hudSlot;
                 container = hudContainer;
@@ -151,8 +153,8 @@ public abstract class Container {
                 // TODO: Crafting
             } else if (javaSlot >= 5 && javaSlot < 9) {
                 // Armor slots
-                Container armorContainer = clickContext.inventoryTracker.getArmorContainer();
-                int armorSlot = armorContainer.bedrockSlot(javaSlot);
+                final Container armorContainer = clickContext.inventoryTracker.getArmorContainer();
+                final int armorSlot = armorContainer.bedrockSlot(javaSlot);
 
                 bedrockSlot = armorSlot;
                 container = armorContainer;
@@ -161,10 +163,10 @@ public abstract class Container {
                 clickContext.prevContainers.add(armorContainer.copy());
             } else if (javaSlot == 45) {
                 // Offhand
-                Container offhandContainer = clickContext.inventoryTracker.getOffhandContainer();
-                int offhandSlot = offhandContainer.bedrockSlot(javaSlot);
+                final Container offhandContainer = clickContext.inventoryTracker.getOffhandContainer();
+                final int offhandSlot = offhandContainer.bedrockSlot(javaSlot);
 
-                bedrockSlot  = offhandSlot;
+                bedrockSlot = offhandSlot;
                 container = offhandContainer;
                 clickContext.container = offhandContainer;
                 clickContext.bedrockSlot = offhandSlot;
@@ -174,7 +176,7 @@ public abstract class Container {
 
         // TODO: Container Limited Slots (e.g. Furnace Fuel/Input/Output) Note: this might not be needed as the server will reject invalid moves anyway
 
-        BedrockItem item = container.getItem(bedrockSlot);
+        final BedrockItem item = container.getItem(bedrockSlot);
         if (item.isEmpty() && cursorItem.isEmpty()) {
             return null;
         }
@@ -193,12 +195,12 @@ public abstract class Container {
     }
 
     private ItemStackRequestAction handlePickupTake(final ClickContext clickContext, final Container container, final int bedrockSlot, final byte button, final BedrockItem item) {
-        int amountToTake = button == 0 ? item.amount() : (item.amount() + 1) / 2;
+        final int amountToTake = button == 0 ? item.amount() : (item.amount() + 1) / 2;
 
-        BedrockItem finalCursorItem = this.copyStackWithAmount(item, amountToTake);
+        final BedrockItem finalCursorItem = this.copyStackWithAmount(item, amountToTake);
         clickContext.inventoryTracker.getHudContainer().setItem(0, finalCursorItem);
 
-        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToTake);
+        final BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToTake);
         container.setItem(bedrockSlot, finalContainerItem);
 
         return new ItemStackRequestAction.TakeAction(
@@ -209,8 +211,8 @@ public abstract class Container {
     }
 
     private ItemStackRequestAction handlePickupPlace(final ClickContext clickContext, final Container container, final int bedrockSlot, final byte button, final BedrockItem cursorItem, final BedrockItem item) {
-        int amt = button == 0 ? cursorItem.amount() : 1;
-        int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(this.user.get(ItemRewriter.class).maxStackSize(item) - item.amount(), amt);
+        final int amt = button == 0 ? cursorItem.amount() : 1;
+        final int amountToPlace = item.isDifferent(cursorItem) ? amt : Math.min(this.user.get(ItemRewriter.class).maxStackSize(item) - item.amount(), amt);
 
         final int containerNetId = item.netId() != null ? item.netId() : 0;
         BedrockItem finalContainerItem = item.copy();
@@ -223,7 +225,7 @@ public abstract class Container {
         container.setItem(bedrockSlot, finalContainerItem);
 
         final int cursorNetId = cursorItem.netId();
-        BedrockItem finalCursorItem = this.itemAfterRemovingAmount(cursorItem, amountToPlace);
+        final BedrockItem finalCursorItem = this.itemAfterRemovingAmount(cursorItem, amountToPlace);
         clickContext.inventoryTracker.getHudContainer().setItem(0, finalCursorItem);
 
         return new ItemStackRequestAction.PlaceAction(
@@ -234,8 +236,8 @@ public abstract class Container {
     }
 
     private ItemStackRequestAction handlePickupSwap(final ClickContext clickContext, final Container container, final int bedrockSlot, final BedrockItem cursorItem, final BedrockItem item) {
-        BedrockItem cursorCopy = cursorItem.copy();
-        BedrockItem itemCopy = item.copy();
+        final BedrockItem cursorCopy = cursorItem.copy();
+        final BedrockItem itemCopy = item.copy();
 
         container.setItem(bedrockSlot, cursorCopy);
         clickContext.inventoryTracker.getHudContainer().setItem(0, itemCopy);
@@ -252,16 +254,16 @@ public abstract class Container {
             return null;
         }
 
-        Container container = clickContext.container;
+        final Container container = clickContext.container;
         if (javaSlot < 0 || javaSlot >= container.getItems().length) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle swap for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
             return null;
         }
 
-        Container hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
+        final Container hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
 
-        BedrockItem item = container.getItem(clickContext.bedrockSlot).copy();
-        BedrockItem hotbarItem = hotbarContainer.getItem(button).copy();
+        final BedrockItem item = container.getItem(clickContext.bedrockSlot).copy();
+        final BedrockItem hotbarItem = hotbarContainer.getItem(button).copy();
 
         if (item.isEmpty() && hotbarItem.isEmpty()) {
             return null;
@@ -315,10 +317,6 @@ public abstract class Container {
                     if (source.container() == range.container() && source.bedrockSlot() == bedrockDestSlot) {
                         continue;
                     }
-                    /*if (!range.container().canQuickMoveToSlot(bedrockDestSlot, sourceItem)) {
-                        continue;
-                    }*/
-
                     final BedrockItem destinationItem = range.container().getItem(bedrockDestSlot);
                     final int slotMaxStackSize = itemRewriter.maxStackSize(destinationItem);
                     if (mergePass) {
@@ -336,7 +334,7 @@ public abstract class Container {
                         continue;
                     }
 
-                    int destNetId = destinationItem != null && !destinationItem.isEmpty() ? destinationItem.netId() : 0;
+                    final int destNetId = destinationItem != null && !destinationItem.isEmpty() ? destinationItem.netId() : 0;
 
                     clickContext.prevContainers.add(source.container());
                     clickContext.prevContainers.add(range.container());
@@ -370,21 +368,21 @@ public abstract class Container {
             return this.dropCursorItem(clickContext.inventoryTracker, button);
         }
 
-        Container container = clickContext.container;
+        final Container container = clickContext.container;
         if (javaSlot < 0 || javaSlot >= container.getItems().length) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle throw for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
             return null;
         }
 
-        BedrockItem item = container.getItem(clickContext.bedrockSlot);
+        final BedrockItem item = container.getItem(clickContext.bedrockSlot);
 
         if (item.isEmpty()) {
             return null;
         }
 
-        int amountToDrop = button == 0 ? 1 : item.amount();
+        final int amountToDrop = button == 0 ? 1 : item.amount();
 
-        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
+        final BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
         container.setItem(clickContext.bedrockSlot, finalContainerItem);
 
         return new ItemStackRequestAction.DropAction(
@@ -395,12 +393,12 @@ public abstract class Container {
     }
 
     private ItemStackRequestAction dropCursorItem(final InventoryTracker inventoryTracker, final byte button) {
-        BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
+        final BedrockItem cursorItem = inventoryTracker.getHudContainer().getItem(0);
         if (cursorItem.isEmpty()) {
             return null;
         }
 
-        int amountToDrop = button == 0 ? cursorItem.amount() : 1;
+        final int amountToDrop = button == 0 ? cursorItem.amount() : 1;
         inventoryTracker.getHudContainer().setItem(0, this.itemAfterRemovingAmount(cursorItem, amountToDrop));
 
         return new ItemStackRequestAction.DropAction(
@@ -411,12 +409,12 @@ public abstract class Container {
     }
 
     protected ItemStackRequestAction dropItem(final Container container, final int bedrockSlot, final int amountToDrop) {
-        BedrockItem item = container.getItem(bedrockSlot);
+        final BedrockItem item = container.getItem(bedrockSlot);
         if (item.isEmpty()) {
             return null;
         }
 
-        BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
+        final BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
         container.setItem(bedrockSlot, finalContainerItem);
 
         return new ItemStackRequestAction.DropAction(
@@ -460,18 +458,9 @@ public abstract class Container {
             );
         }
 
-        final BedrockItem sourceItem = source.container().getItem(source.bedrockSlot());
         return switch (this.type) {
-            case FURNACE, BLAST_FURNACE, SMOKER -> /*this.isFurnaceFuel(sourceItem)
-                    ? List.of(new QuickMoveRange(this, 1, 2, false), new QuickMoveRange(this, 0, 1, false))
-                    :*/ List.of(new QuickMoveRange(this, 0, 1, false), new QuickMoveRange(this, 1, 2, false));
+            case FURNACE, BLAST_FURNACE, SMOKER -> List.of(new QuickMoveRange(this, 0, 1, false), new QuickMoveRange(this, 1, 2, false));
             case BREWING_STAND -> {
-                /*if (this.isItem(sourceItem, "minecraft:blaze_powder")) {
-                    yield List.of(new QuickMoveRange(this, 4, 5, false));
-                }
-                if (this.isBrewingBottle(sourceItem)) {
-                    yield List.of(new QuickMoveRange(this, 0, 3, false));
-                }*/
                 yield List.of(new QuickMoveRange(this, 3, 4, false));
             }
             case BEACON -> List.of(new QuickMoveRange(this, 0, 1, false));
@@ -537,8 +526,8 @@ public abstract class Container {
             return null;
         }
 
-        Container container = clickContext.container;
-        int bedrockSlot = clickContext.bedrockSlot;
+        final Container container = clickContext.container;
+        final int bedrockSlot = clickContext.bedrockSlot;
         final InventoryTracker inventoryTracker = clickContext.inventoryTracker;
 
         if (!(container instanceof InventoryContainer) && (javaSlot < 0 || javaSlot >= container.getItems().length)) {
@@ -567,7 +556,7 @@ public abstract class Container {
     }
 
     private BedrockItem copyStackWithAmount(final BedrockItem item, final int amount) {
-        BedrockItem copy = item.copy();
+        final BedrockItem copy = item.copy();
         copy.setAmount(amount);
         return copy;
     }
@@ -577,32 +566,9 @@ public abstract class Container {
             return BedrockItem.empty();
         }
 
-        BedrockItem copy = item.copy();
+        final BedrockItem copy = item.copy();
         copy.setAmount(item.amount() - amountToRemove);
         return copy;
-    }
-
-    private static final class ClickContext {
-        private Container container;
-        private int bedrockSlot;
-        private final InventoryTracker inventoryTracker;
-        private final InventoryRequestTracker inventoryRequestTracker;
-        private final List<Container> prevContainers = new ArrayList<>();
-        private final Container prevCursorContainer;
-
-        private ClickContext(final Container container, final int bedrockSlot, final InventoryTracker inventoryTracker, final InventoryRequestTracker inventoryRequestTracker) {
-            this.container = container;
-            this.bedrockSlot = bedrockSlot;
-            this.inventoryTracker = inventoryTracker;
-            this.inventoryRequestTracker = inventoryRequestTracker;
-            this.prevCursorContainer = inventoryTracker.getHudContainer().copy();
-        }
-    }
-
-    private record SlotRef(Container container, int bedrockSlot) {
-    }
-
-    private record QuickMoveRange(Container container, int startJavaSlot, int endJavaSlot, boolean backwards) {
     }
 
     public boolean handleButtonClick(final int button) {
@@ -699,17 +665,41 @@ public abstract class Container {
     }
 
     public Container copy() { // TODO: This probably isnt the best way to do this
-        BedrockItem[] itemsCopy = Arrays.copyOf(this.items, this.items.length);
+        final BedrockItem[] itemsCopy = Arrays.copyOf(this.items, this.items.length);
         return new Container(this.user, this.containerId, this.type, this.title, this.position, itemsCopy, this.validBlockTags) {
             @Override
-            public FullContainerName getFullContainerName(int slot) {
+            public FullContainerName getFullContainerName(final int slot) {
                 return Container.this.getFullContainerName(slot);
             }
         };
     }
 
-    public short translateContainerData(int containerData) {
+    public short translateContainerData(final int containerData) {
         ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "translateContainerData not implemented for container type: " + this.type);
         return -1;
     }
+
+    private static final class ClickContext {
+        private Container container;
+        private int bedrockSlot;
+        private final InventoryTracker inventoryTracker;
+        private final InventoryRequestTracker inventoryRequestTracker;
+        private final List<Container> prevContainers = new ArrayList<>();
+        private final Container prevCursorContainer;
+
+        private ClickContext(final Container container, final int bedrockSlot, final InventoryTracker inventoryTracker, final InventoryRequestTracker inventoryRequestTracker) {
+            this.container = container;
+            this.bedrockSlot = bedrockSlot;
+            this.inventoryTracker = inventoryTracker;
+            this.inventoryRequestTracker = inventoryRequestTracker;
+            this.prevCursorContainer = inventoryTracker.getHudContainer().copy();
+        }
+    }
+
+    private record SlotRef(Container container, int bedrockSlot) {
+    }
+
+    private record QuickMoveRange(Container container, int startJavaSlot, int endJavaSlot, boolean backwards) {
+    }
+
 }

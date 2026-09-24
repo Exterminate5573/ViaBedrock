@@ -19,4 +19,5 @@ package net.raphimc.viabedrock.protocol.model.recipe;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.Enchant_Type;
 
-public record EnchantData(int cost, Enchant_Type type, int level, int netId) {}
+public record EnchantData(int cost, Enchant_Type type, int level, int netId) {
+}

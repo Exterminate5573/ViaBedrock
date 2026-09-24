@@ -18,15 +18,27 @@
 package net.raphimc.viabedrock.protocol.types;
 
 import com.viaversion.viaversion.api.type.Type;
-
-import net.raphimc.viabedrock.protocol.model.inventory.*;
+import net.raphimc.viabedrock.protocol.model.inventory.InventorySource;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackResponseContainerInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackResponseInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackResponseSlotInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.LegacySetItemSlotData;
 import net.raphimc.viabedrock.protocol.model.recipe.ItemDescriptor;
-import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import net.raphimc.viabedrock.protocol.types.array.ArrayType;
-import net.raphimc.viabedrock.protocol.types.inventory.*;
+import net.raphimc.viabedrock.protocol.types.inventory.InventorySourcePacketType;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackActionType;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackContainerResponseType;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackRequestType;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackResponseType;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackSlotRequestType;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackSlotResponseType;
+import net.raphimc.viabedrock.protocol.types.inventory.LegacySetItemSlotDataType;
 import net.raphimc.viabedrock.protocol.types.recipe.NetworkItemDescriptorType;
 
-public class InventoryTypes {
+public final class InventoryTypes {
 
     public static final Type<LegacySetItemSlotData[]> LEGACY_SET_ITEM_SLOT_DATA = new ArrayType<>(new LegacySetItemSlotDataType(), BedrockTypes.UNSIGNED_VAR_INT);
     public static final Type<InventorySource> INVENTORY_SOURCE = new InventorySourcePacketType();
@@ -41,5 +53,8 @@ public class InventoryTypes {
 
     public static final Type<ItemDescriptor> ITEM_DESCRIPTOR_TYPE = new NetworkItemDescriptorType();
     public static final Type<ItemDescriptor[]> ITEM_DESCRIPTORS = new ArrayType<>(ITEM_DESCRIPTOR_TYPE, BedrockTypes.UNSIGNED_VAR_INT);
+
+    private InventoryTypes() {
+    }
 
 }

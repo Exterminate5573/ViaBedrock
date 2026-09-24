@@ -29,36 +29,39 @@ public abstract class Recipe {
     private final String recipeTag;
     private final int priority;
 
-    public Recipe(String uniqueId, UUID recipeId, String recipeTag, int priority) {
+    public Recipe(final String uniqueId, final UUID recipeId, final String recipeTag, final int priority) {
         this.uniqueId = uniqueId;
         this.recipeId = recipeId;
         this.recipeTag = recipeTag;
         this.priority = priority;
     }
 
-    public  String getUniqueId() {
-        return uniqueId;
+    public String getUniqueId() {
+        return this.uniqueId;
     }
+
     public UUID getRecipeId() {
-        return recipeId;
+        return this.recipeId;
     }
+
     public String getRecipeTag() {
-        return recipeTag;
+        return this.recipeTag;
     }
+
     public int getPriority() {
-        return priority;
+        return this.priority;
     }
 
     public abstract void writeJavaRecipeData(final PacketWrapper packet, final UserConnection user);
 
     @Override
     public String toString() {
-        return "Recipe{" +
-                "uniqueId='" + uniqueId + '\'' +
-                ", recipeId=" + recipeId +
-                ", recipeTag='" + recipeTag + '\'' +
-                ", priority=" + priority +
-                '}';
+        return "Recipe{"
+                + "uniqueId='" + this.uniqueId + '\''
+                + ", recipeId=" + this.recipeId
+                + ", recipeTag='" + this.recipeTag + '\''
+                + ", priority=" + this.priority
+                + '}';
     }
 
 }

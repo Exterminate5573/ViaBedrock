@@ -28,12 +28,12 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 
 public class SmokerContainer extends FurnaceContainer {
 
-    public SmokerContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public SmokerContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.SMOKER, title, position, CustomBlockTags.SMOKER);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         if (slot == 0) {
             return new FullContainerName(ContainerEnumName.SmokerIngredientContainer, null);
         } else {

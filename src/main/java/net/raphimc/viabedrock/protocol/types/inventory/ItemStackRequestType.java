@@ -34,20 +34,21 @@ public class ItemStackRequestType extends Type<ItemStackRequestInfo> {
     }
 
     @Override
-    public ItemStackRequestInfo read(ByteBuf buffer) {
-        int requestId = BedrockTypes.VAR_INT.read(buffer);
-        List<ItemStackRequestAction> actions = List.of(InventoryTypes.ITEM_STACK_REQUEST_ACTIONS.read(buffer));
-        List<String> toFilter = List.of(BedrockTypes.STRING_ARRAY.read(buffer));
-        TextProcessingEventOrigin origin = TextProcessingEventOrigin.getByValue(BedrockTypes.INT_LE.read(buffer));
+    public ItemStackRequestInfo read(final ByteBuf buffer) {
+        final int requestId = BedrockTypes.VAR_INT.read(buffer);
+        final List<ItemStackRequestAction> actions = List.of(InventoryTypes.ITEM_STACK_REQUEST_ACTIONS.read(buffer));
+        final List<String> toFilter = List.of(BedrockTypes.STRING_ARRAY.read(buffer));
+        final TextProcessingEventOrigin origin = TextProcessingEventOrigin.getByValue(BedrockTypes.INT_LE.read(buffer));
 
         return new ItemStackRequestInfo(requestId, actions, toFilter, origin);
     }
 
     @Override
-    public void write(ByteBuf buffer, ItemStackRequestInfo value) {
+    public void write(final ByteBuf buffer, final ItemStackRequestInfo value) {
         BedrockTypes.VAR_INT.write(buffer, value.requestId());
         InventoryTypes.ITEM_STACK_REQUEST_ACTIONS.write(buffer, value.actions().toArray(new ItemStackRequestAction[0]));
         BedrockTypes.STRING_ARRAY.write(buffer, value.toFilter().toArray(new String[0]));
         BedrockTypes.INT_LE.write(buffer, value.origin().getValue());
     }
+
 }

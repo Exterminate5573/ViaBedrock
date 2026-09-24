@@ -44,12 +44,12 @@ public class AnvilContainer extends Container {
 
     private String renameText = "";
 
-    public AnvilContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public AnvilContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.ANVIL, title, position, 3, CustomBlockTags.ANVIL);
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
             case 1 -> new FullContainerName(ContainerEnumName.AnvilInputContainer, null);
             case 2 -> new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null);
@@ -79,7 +79,7 @@ public class AnvilContainer extends Container {
     }
 
     @Override
-    public BedrockItem getItem(int bedrockSlot) {
+    public BedrockItem getItem(final int bedrockSlot) {
         return switch (bedrockSlot) {
             case 1 -> this.items[0];
             case 2 -> this.items[1];
@@ -101,24 +101,24 @@ public class AnvilContainer extends Container {
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 2) {
-            InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-            InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
+            final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
+            final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
 
-            int requestId = inventoryRequestTracker.nextRequestId();
+            final int requestId = inventoryRequestTracker.nextRequestId();
 
-            List<Container> prevContainers = new ArrayList<>();
+            final List<Container> prevContainers = new ArrayList<>();
             prevContainers.add(this.copy());
             prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-            Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
+            final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-            BedrockItem resultItem = this.getItem(1);
+            final BedrockItem resultItem = this.getItem(1);
 
-            List<ItemStackRequestAction> actions = new ArrayList<>();
+            final List<ItemStackRequestAction> actions = new ArrayList<>();
             actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)); //TODO: This needs more debugging
 
             // TODO: Recipe Check
             if (!this.getItem(2).isEmpty()) {
-                actions.add(new ItemStackRequestAction.ConsumeAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
+                actions.add(new ItemStackRequestAction.ConsumeAction(1, /*Probably needs an algo*/ new ItemStackRequestSlotInfo(
                         new FullContainerName(ContainerEnumName.AnvilMaterialContainer, null),
                         (byte) 2,
                         this.getItem(2).netId()
@@ -130,17 +130,17 @@ public class AnvilContainer extends Container {
                     (byte) 1,
                     this.getItem(1).netId()
             )));
-            actions.add(new ItemStackRequestAction.PlaceAction(1,/*Probably needs an algo*/ new ItemStackRequestSlotInfo(
+            actions.add(new ItemStackRequestAction.PlaceAction(1, /*Probably needs an algo*/ new ItemStackRequestSlotInfo(
                     new FullContainerName(ContainerEnumName.CreatedOutputContainer, null),
                     (byte) 50,
                     requestId
-            ), new ItemStackRequestSlotInfo( // TODO: Shift click
+            ), new ItemStackRequestSlotInfo(// TODO: Shift click
                     new FullContainerName(ContainerEnumName.CursorContainer, null),
                     (byte) 0,
                     0 // Will be filled by the server
             )));
 
-            List<String> filterStrings = new ArrayList<>();
+            final List<String> filterStrings = new ArrayList<>();
             TextProcessingEventOrigin origin = TextProcessingEventOrigin.unknown;
             if (!this.getRenameText().isEmpty()) {
                 filterStrings.add(this.getRenameText());
@@ -150,7 +150,7 @@ public class AnvilContainer extends Container {
                 //resultItem.
             }
 
-            ItemStackRequestInfo request = new ItemStackRequestInfo(
+            final ItemStackRequestInfo request = new ItemStackRequestInfo(
                     requestId,
                     actions,
                     filterStrings,
@@ -171,10 +171,10 @@ public class AnvilContainer extends Container {
     }
 
     public String getRenameText() {
-        return renameText;
+        return this.renameText;
     }
 
-    public void setRenameText(String renameText) {
+    public void setRenameText(final String renameText) {
         this.renameText = renameText;
     }
 

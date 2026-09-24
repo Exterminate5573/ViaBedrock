@@ -28,25 +28,24 @@ import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets
 
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
-import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
+
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
-import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
 public class CrafterContainer extends Container {
 
-    public CrafterContainer(UserConnection user, byte containerId, TextComponent title, BlockPosition position) {
+    public CrafterContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.CRAFTER, title, position, 9, CustomBlockTags.CRAFTER);
 
-        boolean[] disabledSlots = getCrafterMetadata();
+        final boolean[] disabledSlots = this.getCrafterMetadata();
         for (short i = 0; i < 9; i++) {
-            boolean disabled = disabledSlots[i];
+            final boolean disabled = disabledSlots[i];
 
-            PacketWrapper setData = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
+            final PacketWrapper setData = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
             setData.write(Types.VAR_INT, (int) this.javaContainerId());
             setData.write(Types.SHORT, i);
             setData.write(Types.SHORT, (short) (disabled ? 1 : 0));
@@ -55,7 +54,7 @@ public class CrafterContainer extends Container {
     }
 
     @Override
-    public FullContainerName getFullContainerName(int slot) {
+    public FullContainerName getFullContainerName(final int slot) {
         return new FullContainerName(ContainerEnumName.AnvilInputContainer, null); // Bedrock moment, from testing they send AnvilInput
     }
 
@@ -65,19 +64,6 @@ public class CrafterContainer extends Container {
 
             // TODO: Minecraft wiki says it gets handled here but java currently sends a CONTAINER_SLOT_STATE_CHANGED packet which we can use instead
 
-            /*boolean[] disabledSlots = getCrafterMetadata();
-            boolean disabled = disabledSlots[javaSlot];
-            disabled = !disabled;
-
-            PacketWrapper wrapper = PacketWrapper.create(ServerboundBedrockPackets.TOGGLE_CRAFTER_SLOT_REQUEST, this.user);
-            wrapper.write(BedrockTypes.INT_LE, this.position.x());
-            wrapper.write(BedrockTypes.INT_LE, this.position.y());
-            wrapper.write(BedrockTypes.INT_LE, this.position.z());
-            wrapper.write(Types.UNSIGNED_BYTE, javaSlot);
-            wrapper.write(Types.BOOLEAN, disabled);
-            wrapper.sendToServer(BedrockProtocol.class);
-            */
-
             return true;
         } else if (javaSlot == 45) {
             return true;
@@ -86,13 +72,15 @@ public class CrafterContainer extends Container {
     }
 
     private boolean[] getCrafterMetadata() {
-        ChunkTracker ct = this.user.get(ChunkTracker.class);
+        final ChunkTracker ct = this.user.get(ChunkTracker.class);
 
-        CompoundTag tag = ct.getBlockEntity(position).tag();
-        if (tag == null || !tag.contains("disabled_slots")) return new boolean[9];
+        final CompoundTag tag = ct.getBlockEntity(position).tag();
+        if (tag == null || !tag.contains("disabled_slots")) {
+            return new boolean[9];
+        }
 
-        boolean[] disabledSlots = new boolean[9];
-        int mask = ((ShortTag) tag.get("disabled_slots")).asInt();
+        final boolean[] disabledSlots = new boolean[9];
+        final int mask = ((ShortTag) tag.get("disabled_slots")).asInt();
         for (int i = 0; i < 9; i++) {
             disabledSlots[i] = (mask & (1 << i)) != 0;
         }

@@ -21,6 +21,7 @@ import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectMap;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap;
 
 public enum ItemDescriptorType {
+
     INVALID(0),
     DEFAULT(1),
     MOLANG(2),
@@ -29,6 +30,8 @@ public enum ItemDescriptorType {
     COMPLEX_ALIAS(5);
 
     private static final Int2ObjectMap<ItemDescriptorType> BY_VALUE = new Int2ObjectOpenHashMap<>();
+
+    private final int value;
 
     static {
         for (ItemDescriptorType value : values()) {
@@ -64,8 +67,6 @@ public enum ItemDescriptorType {
         return fallback;
     }
 
-    private final int value;
-
     ItemDescriptorType(final ItemDescriptorType value) {
         this(value.value);
     }
@@ -77,4 +78,5 @@ public enum ItemDescriptorType {
     public int getValue() {
         return this.value;
     }
+
 }

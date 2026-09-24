@@ -24,8 +24,6 @@ import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 
 import net.raphimc.viabedrock.api.model.entity.Entity;
-import net.raphimc.viabedrock.protocol.BedrockProtocol;
-import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerActionType;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
@@ -33,9 +31,9 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import net.raphimc.viabedrock.protocol.types.InventoryTypes;
 
-public class PlayerActionPacketFactory {
+public final class PlayerActionPacketFactory {
 
-    public static void sendBedrockPlayerAction(final UserConnection user, long entityId, PlayerActionType actionType, BlockPosition position, BlockPosition resultPosition, int face) {
+    public static void sendBedrockPlayerAction(final UserConnection user, final long entityId, final PlayerActionType actionType, final BlockPosition position, final BlockPosition resultPosition, final int face) {
         final PacketWrapper startItemUseOn = PacketWrapper.create(ServerboundBedrockPackets.PLAYER_ACTION, user);
         startItemUseOn.write(BedrockTypes.UNSIGNED_VAR_LONG, entityId); // entity runtime id
         startItemUseOn.write(BedrockTypes.VAR_INT, actionType.getValue()); // action type
@@ -45,21 +43,21 @@ public class PlayerActionPacketFactory {
         startItemUseOn.sendToServer(BedrockProtocol.class);
     }
 
-    public static void sendBedrockInventoryRequest(final UserConnection user, ItemStackRequestInfo[] info) {
+    public static void sendBedrockInventoryRequest(final UserConnection user, final ItemStackRequestInfo[] info) {
         final PacketWrapper inventoryRequest = PacketWrapper.create(ServerboundBedrockPackets.ITEM_STACK_REQUEST, user);
         inventoryRequest.write(InventoryTypes.ITEM_STACK_REQUESTS, info);
         inventoryRequest.sendToServer(BedrockProtocol.class);
     }
 
-    public static void sendBedrockDismount(final UserConnection user, long entityRId) {
+    public static void sendBedrockDismount(final UserConnection user, final long entityRuntimeId) {
         final PacketWrapper dismountPacket = PacketWrapper.create(ServerboundBedrockPackets.INTERACT, user);
         dismountPacket.write(Types.UNSIGNED_BYTE, (short) InteractPacketPayload_Action.StopRiding.getValue()); // action
-        dismountPacket.write(BedrockTypes.UNSIGNED_VAR_LONG, entityRId); // target entity runtime id
+        dismountPacket.write(BedrockTypes.UNSIGNED_VAR_LONG, entityRuntimeId); // target entity runtime id
         dismountPacket.write(BedrockTypes.OPTIONAL_POSITION_3F, null); // position
         dismountPacket.sendToServer(BedrockProtocol.class);
     }
 
-    public static void sendJavaSetPassengers(final UserConnection user, Entity vehicle) {
+    public static void sendJavaSetPassengers(final UserConnection user, final Entity vehicle) {
         final EntityTracker entityTracker = user.get(EntityTracker.class);
         final PacketWrapper setPassengersPacket = PacketWrapper.create(ClientboundPackets26_3.SET_PASSENGERS, user);
         setPassengersPacket.write(Types.VAR_INT, vehicle.javaId()); // vehicle
@@ -68,6 +66,9 @@ public class PlayerActionPacketFactory {
             setPassengersPacket.write(Types.VAR_INT, entityTracker.getEntityByUid(passengerUid).javaId()); // passenger id
         }
         setPassengersPacket.send(BedrockProtocol.class);
+    }
+
+    private PlayerActionPacketFactory() {
     }
 
 }

@@ -22,7 +22,6 @@ import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.api.minecraft.Holder;
-import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.protocol.remapper.PacketHandlers;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
@@ -83,7 +82,7 @@ import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import java.util.ArrayList;
 import java.util.logging.Level;
 
-public class InventoryPackets {
+public final class InventoryPackets {
 
     private static final int DIALOG_BUTTON_WIDTH = 200;
     private static final int DIALOG_FAKE_BUTTON_WIDTH = 300;
@@ -135,7 +134,7 @@ public class InventoryPackets {
                 case SMOKER -> container = new SmokerContainer(wrapper.user(), containerId, title, position);
                 case BREWING_STAND -> container = new BrewingStandContainer(wrapper.user(), containerId, title, position);
                 case BEACON -> container = new BeaconContainer(wrapper.user(), containerId, title, position);
-                case ENCHANTMENT -> container = new EnchantmentContainer(wrapper.user(),  containerId, title, position);
+                case ENCHANTMENT -> container = new EnchantmentContainer(wrapper.user(), containerId, title, position);
                 case ANVIL -> container = new AnvilContainer(wrapper.user(), containerId, title, position);
                 case SMITHING_TABLE -> container = new SmithingContainer(wrapper.user(), containerId, title, position);
                 case STONECUTTER -> container = new StonecutterContainer(wrapper.user(), containerId, title, position);
@@ -250,7 +249,7 @@ public class InventoryPackets {
             final Form form;
             try {
                 form = FormSerializer.deserialize(data);
-            } catch (Throwable e) { // Bedrock client shows error modal form
+            } catch (final Throwable e) { // Bedrock client shows error modal form
                 ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Error while deserializing form data: " + data, e);
                 wrapper.cancel();
                 return;
@@ -296,6 +295,7 @@ public class InventoryPackets {
                         } else if (element instanceof LabelFormElement label) {
                             actionDialog.getActions().add(new ActionButton(TextUtil.stringToTextComponent(label.getText()), new StringComponent(DIALOG_FAKE_BUTTON_TEXT), DIALOG_FAKE_BUTTON_WIDTH, exitButton.getAction()));
                         } else if (element instanceof DividerFormElement) {
+                            // No op
                         } else {
                             throw new IllegalArgumentException("Unhandled form element type: " + element.getClass().getSimpleName());
                         }
@@ -464,8 +464,8 @@ public class InventoryPackets {
         });
         protocol.registerServerbound(ServerboundPackets26_3.SET_CREATIVE_MODE_SLOT, null, wrapper -> {
             wrapper.cancel();
-            final short slot = wrapper.read(Types.SHORT); // slot
-            final Item item = wrapper.read(VersionedTypes.V26_3.lengthPrefixedItem); // item
+            wrapper.read(Types.SHORT); // slot
+            wrapper.read(VersionedTypes.V26_3.lengthPrefixedItem); // item
 
             final InventoryTracker inventoryTracker = wrapper.user().get(InventoryTracker.class);
             if (inventoryTracker.getPendingCloseContainer() != null) {
@@ -506,7 +506,9 @@ public class InventoryPackets {
             } else if (form instanceof CustomForm customForm) {
                 for (int elementIndex = 0; elementIndex < customForm.getElements().length; elementIndex++) {
                     final String inputKey = String.valueOf(elementIndex);
-                    if (!payload.contains(inputKey)) continue;
+                    if (!payload.contains(inputKey)) {
+                        continue;
+                    }
                     final FormElement element = customForm.getElements()[elementIndex];
                     if (element instanceof CheckboxFormElement checkbox) {
                         checkbox.setChecked(payload.getBoolean(inputKey));
@@ -593,6 +595,9 @@ public class InventoryPackets {
                 dialog.getInputs().add(new Input("dummy", new BooleanInput(TextUtil.stringToTextComponent(text))));
             }
         }
+    }
+
+    private InventoryPackets() {
     }
 
 }
