@@ -425,10 +425,6 @@ public class EntityPackets {
                 return;
             }
 
-            ViaBedrock.getPlatform().getLogger().warning("ActorEvent: " + event); // TODO: Test logging (remove for merge)
-
-            //https://minecraft.wiki/w/Bedrock_Edition_protocol/Entity_Events
-            //https://minecraft.wiki/w/Java_Edition_protocol/Entity_statuses
             switch (event) {
                 case HURT -> { // Sent when an entity gets hurt
                     final CompoundTag damageTypeRegistry = gameSession.getJavaRegistries().getCompoundTag(RegistryKeys.DAMAGE_TYPE);
@@ -482,7 +478,7 @@ public class EntityPackets {
                     wrapper.write(Types.BYTE, EntityEvent.EAT_GRASS.getValue()); // entity event
                 }
                 case SQUID_FLEEING -> { // Sent when you attack a squid, most likely used for the ink particles
-                    //TODO: Java has no equivalent event, send particles here
+                    wrapper.cancel();
                 }
                 case ZOMBIE_CONVERTING -> { // TODO
                     wrapper.write(Types.INT, entity.javaId()); // entity id
@@ -524,8 +520,6 @@ public class EntityPackets {
                 }
                 case IN_LOVE_HEARTS -> { //TODO: What calls this?
                     wrapper.cancel();
-                    //wrapper.write(Types.INT, entity.javaId()); // entity id
-                    //wrapper.write(Types.BYTE, EntityEvent.IN_LOVE_HEARTS.getValue()); // entity event
                 }
                 case SILVERFISH_MERGE_ANIM -> { // Displays particles when a silverfish merges into a block
                     wrapper.write(Types.INT, entity.javaId()); // entity id
@@ -574,17 +568,9 @@ public class EntityPackets {
                 }
                 case DRAGON_START_DEATH_ANIM -> {
                     wrapper.cancel();
-
-                    EntityData entityData = new EntityData(entity.getJavaEntityDataIndex("PHASE"),  VersionedTypes.V1_21_9.entityDataTypes().varIntType, 9); // DYING phase
-                    //TODO: Allow java entity data to be set
-                    //TODO: Test
                 }
                 case PUKE -> {
                     wrapper.cancel();
-
-                    EntityData entityData = new EntityData(entity.getJavaEntityDataIndex("PHASE"),  VersionedTypes.V1_21_9.entityDataTypes().varIntType, 5); // Breath attack phase
-                    //TODO: Allow java entity data to be set
-                    //TODO: Check this is correct and test if it works
                 }
                 case NONE, // TODO: Whats the point of this????
                      JUMP, // TODO: What calls this?
@@ -592,7 +578,7 @@ public class EntityPackets {
                      FISHHOOK_BUBBLE, // TODO: Sync
                      FISHHOOK_FISHPOS, // TODO: Sync
                      FISHHOOK_HOOKTIME, // TODO: Sync
-                     PLAY_AMBIENT, // TODO: Why the fuck is this an entity event? Does it ever actually get used????????
+                     PLAY_AMBIENT, // No Java event mapping yet
                      DRINK_POTION, // TODO: Find java equivalent
                      THROW_POTION, // TODO: Find java equivalent
                      PRIME_TNTCART, // TODO: Find java equivalent
@@ -621,7 +607,6 @@ public class EntityPackets {
                         -> wrapper.cancel();
                 default -> {
                     wrapper.cancel();
-                    throw new IllegalStateException("Unhandled ActorEvent: " + event);
                 }
             }
         });
