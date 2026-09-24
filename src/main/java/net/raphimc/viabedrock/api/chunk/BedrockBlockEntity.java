@@ -28,6 +28,9 @@ public class BedrockBlockEntity implements BlockEntity {
     private final CompoundTag tag;
 
     public BedrockBlockEntity(final CompoundTag tag) {
+        if (tag == null) {
+            throw new IllegalArgumentException("Tag cannot be null");
+        }
         this.tag = tag;
 
         int x = 0;
