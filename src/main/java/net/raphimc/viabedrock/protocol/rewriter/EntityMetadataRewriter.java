@@ -29,11 +29,11 @@ import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.api.model.entity.LivingEntity;
+import net.raphimc.viabedrock.protocol.BedrockProtocol;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.ActorDataIds;
 import net.raphimc.viabedrock.protocol.model.entity.EntityProperty;
 import net.raphimc.viabedrock.protocol.model.entity.EntityPropertyList;
 import net.raphimc.viabedrock.protocol.storage.EntityPropertyTracker;
-import net.raphimc.viabedrock.protocol.BedrockProtocol;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.ActorDataIDs;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.ActorFlags;
 import net.raphimc.viabedrock.protocol.data.generated.java.EntityDataFields;
 import net.raphimc.viabedrock.protocol.model.EntityAttribute;
@@ -46,14 +46,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 
-public class EntityMetadataRewriter {
+public final class EntityMetadataRewriter {
 
-    public static boolean rewrite(final UserConnection user, final Entity entity, final ActorDataIDs id, final EntityData entityData, final List<EntityData> javaEntityData) {
-        EntityTracker entityTracker = user.get(EntityTracker.class);
+    public static boolean rewrite(final UserConnection user, final Entity entity, final ActorDataIds id, final EntityData entityData, final List<EntityData> javaEntityData) {
+        final EntityTracker entityTracker = user.get(EntityTracker.class);
 
         switch (id) {
             case RESERVED_0, RESERVED_092 -> { // Entity flags mask
-                Set<ActorFlags> bedrockFlags = entity.entityFlags();
+                final Set<ActorFlags> bedrockFlags = entity.entityFlags();
                 byte javaBitMask = 0; // https://minecraft.wiki/w/Java_Edition_protocol/Entity_metadata#Entity
                 if (bedrockFlags.contains(ActorFlags.ONFIRE)) {
                     javaBitMask |= (1 << 0);
@@ -80,7 +80,7 @@ public class EntityMetadataRewriter {
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SHARED_FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, javaBitMask));
 
                 if (entity.javaType().is(EntityTypes26_3.END_CRYSTAL)) {
-                    boolean showBottom = bedrockFlags.contains(ActorFlags.SHOW_BOTTOM);
+                    final boolean showBottom = bedrockFlags.contains(ActorFlags.SHOW_BOTTOM);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SHOW_BOTTOM), VersionedTypes.V26_3.entityDataTypes().booleanType, showBottom));
                 }
 
@@ -105,27 +105,27 @@ public class EntityMetadataRewriter {
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.GHAST)) {
-                    boolean attacking = bedrockFlags.contains(ActorFlags.CHARGED);
+                    final boolean attacking = bedrockFlags.contains(ActorFlags.CHARGED);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.IS_CHARGING), VersionedTypes.V26_3.entityDataTypes().booleanType, attacking));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.SNOW_GOLEM)) {
-                    byte hasPumpkin = (byte) (bedrockFlags.contains(ActorFlags.SHEARED) ? 0 : 0x10);
+                    final byte hasPumpkin = (byte) (bedrockFlags.contains(ActorFlags.SHEARED) ? 0 : 0x10);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, hasPumpkin));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.ALLAY)) {
-                    boolean dancing = bedrockFlags.contains(ActorFlags.DANCING);
+                    final boolean dancing = bedrockFlags.contains(ActorFlags.DANCING);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.DANCING), VersionedTypes.V26_3.entityDataTypes().booleanType, dancing));
                 }
 
                 if (entity.javaType().isOrHasParent(EntityTypes26_3.ABSTRACT_AGEABLE)) {
-                    boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
+                    final boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.BABY), VersionedTypes.V26_3.entityDataTypes().booleanType, isBaby));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.AXOLOTL)) {
-                    boolean playingDead = bedrockFlags.contains(ActorFlags.PLAYING_DEAD);
+                    final boolean playingDead = bedrockFlags.contains(ActorFlags.PLAYING_DEAD);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.PLAYING_DEAD), VersionedTypes.V26_3.entityDataTypes().booleanType, playingDead));
                 }
 
@@ -141,7 +141,7 @@ public class EntityMetadataRewriter {
                 if (entity.javaType().is(EntityTypes26_3.FOX)) { // TODO: Test
                     byte foxBitMask = 0;
                     if (false) { // TODO: Sitting
-                       foxBitMask |= 0x01;
+                        foxBitMask |= 0x01;
                     }
                     // 0x02: Unused
                     if (false) { // TODO: Crouching
@@ -167,7 +167,7 @@ public class EntityMetadataRewriter {
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.OCELOT)) {
-                    boolean isTrusting = bedrockFlags.contains(ActorFlags.TRUSTING);
+                    final boolean isTrusting = bedrockFlags.contains(ActorFlags.TRUSTING);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TRUSTING), VersionedTypes.V26_3.entityDataTypes().booleanType, isTrusting));
                 }
 
@@ -204,7 +204,7 @@ public class EntityMetadataRewriter {
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.STRIDER)) {
-                    boolean shaking =  bedrockFlags.contains(ActorFlags.SHAKING);
+                    final boolean shaking = bedrockFlags.contains(ActorFlags.SHAKING);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SUFFOCATING), VersionedTypes.V26_3.entityDataTypes().booleanType, shaking));
                 }
 
@@ -234,59 +234,59 @@ public class EntityMetadataRewriter {
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.BLAZE)) {
-                    byte onFire = (byte) (bedrockFlags.contains(ActorFlags.CHARGED) ? 0x01 : 0);
+                    final byte onFire = (byte) (bedrockFlags.contains(ActorFlags.CHARGED) ? 0x01 : 0);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, onFire));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.BOGGED)) {
-                    boolean isSheared = bedrockFlags.contains(ActorFlags.SHEARED);
+                    final boolean isSheared = bedrockFlags.contains(ActorFlags.SHEARED);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SHEARED), VersionedTypes.V26_3.entityDataTypes().booleanType, isSheared));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.CREEPER)) {
-                    boolean charged = bedrockFlags.contains(ActorFlags.CHARGED);
+                    final boolean charged = bedrockFlags.contains(ActorFlags.CHARGED);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.IS_POWERED), VersionedTypes.V26_3.entityDataTypes().booleanType, charged));
 
-                    boolean ignited = bedrockFlags.contains(ActorFlags.IGNITED);
+                    final boolean ignited = bedrockFlags.contains(ActorFlags.IGNITED);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.IS_IGNITED), VersionedTypes.V26_3.entityDataTypes().booleanType, ignited));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.SPIDER)) {
-                    boolean climbing = bedrockFlags.contains(ActorFlags.WALLCLIMBING);
-                    byte mask = (byte) (climbing ? 1 : 0);
+                    final boolean climbing = bedrockFlags.contains(ActorFlags.WALLCLIMBING);
+                    final byte mask = (byte) (climbing ? 1 : 0);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, mask));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.ZOGLIN)) {
-                    boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
+                    final boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.BABY), VersionedTypes.V26_3.entityDataTypes().booleanType, isBaby));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.ZOMBIE)) {
-                    boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
+                    final boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.BABY), VersionedTypes.V26_3.entityDataTypes().booleanType, isBaby));
                 }
 
                 if (entity.javaType().is(EntityTypes26_3.PIGLIN)) {
-                    boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
+                    final boolean isBaby = bedrockFlags.contains(ActorFlags.BABY);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.BABY), VersionedTypes.V26_3.entityDataTypes().booleanType, isBaby));
 
-                    boolean isDancing = bedrockFlags.contains(ActorFlags.DANCING);
+                    final boolean isDancing = bedrockFlags.contains(ActorFlags.DANCING);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.IS_DANCING), VersionedTypes.V26_3.entityDataTypes().booleanType, isDancing));
                 }
 
                 if (entity.javaType().isOrHasParent(EntityTypes26_3.ABSTRACT_RAIDER)) { //TODO: Test
-                    boolean isCelebrating = bedrockFlags.contains(ActorFlags.CELEBRATING);
+                    final boolean isCelebrating = bedrockFlags.contains(ActorFlags.CELEBRATING);
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.IS_CELEBRATING), VersionedTypes.V26_3.entityDataTypes().booleanType, isCelebrating));
                 }
 
             }
             case VARIANT -> {
-                int variant = readNumber(entityData).intValue();
+                final int variant = readNumber(entityData).intValue();
 
                 switch (entity.javaType()) {
                     case WOLF -> {
-                        int javaVariant = switch (variant) {
+                        final int javaVariant = switch (variant) {
                             case 0 -> 4; // PALE
                             case 1 -> 7; // ASHEN
                             case 2 -> 6; // BLACK
@@ -307,7 +307,7 @@ public class EntityMetadataRewriter {
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TYPE_VARIANT), VersionedTypes.V26_3.entityDataTypes().varIntType, variant));
                     }
                     case FROG -> {
-                        int javaVariant = switch (variant) {
+                        final int javaVariant = switch (variant) {
                             case 0 -> 1; // TEMPERATE
                             case 1 -> 2; // COLD
                             case 2 -> 0; // WARM
@@ -322,13 +322,14 @@ public class EntityMetadataRewriter {
                         //TODO: Remap tropical fish variants properly
                         //javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TYPE_VARIANT), VersionedTypes.V26_3.entityDataTypes().varIntType, variant));
                     }
-                    case PUFFERFISH -> {} // For some reason bedrock sends the puffed state here as well as in the PUFFED_STATE Actor ID so we ignore this one
+                    case PUFFERFISH -> {
+                    } // For some reason bedrock sends the puffed state here as well as in the PUFFED_STATE Actor ID so we ignore this one
                     case SHULKER -> {
-                        byte color = (byte) variant;
+                        final byte color = (byte) variant;
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.COLOR), VersionedTypes.V26_3.entityDataTypes().byteType, color));
                     }
                     case AXOLOTL -> {
-                        int javaVariant = switch (variant) {
+                        final int javaVariant = switch (variant) {
                             case 0 -> 0; // LUCY
                             case 1 -> 3; // CYAN
                             case 2 -> 2; // GOLD
@@ -342,7 +343,7 @@ public class EntityMetadataRewriter {
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.VARIANT), VersionedTypes.V26_3.entityDataTypes().varIntType, javaVariant));
                     }
                     case MOOSHROOM -> {
-                        int javaVariant = switch (variant) {
+                        final int javaVariant = switch (variant) {
                             case 0 -> 0; // RED
                             case 1 -> 1; // BROWN
                             default -> {
@@ -356,15 +357,15 @@ public class EntityMetadataRewriter {
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SIZE), VersionedTypes.V26_3.entityDataTypes().varIntType, variant));
                     }
                     case RABBIT -> { // TODO: Test when I can
-                        int javaVariant = variant;
+                        final int javaVariant = variant;
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TYPE), VersionedTypes.V26_3.entityDataTypes().varIntType, javaVariant));
                     }
                     case PARROT -> { // TODO: Test when I can
-                        int javaVariant = variant;
+                        final int javaVariant = variant;
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.VARIANT), VersionedTypes.V26_3.entityDataTypes().varIntType, javaVariant));
                     }
                     case CAT -> { // TODO: Test when I can
-                        int javaVariant = variant;
+                        final int javaVariant = variant;
                         javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.VARIANT), VersionedTypes.V26_3.entityDataTypes().varIntType, javaVariant));
                     }
                     default -> {
@@ -376,7 +377,7 @@ public class EntityMetadataRewriter {
 
             }
             case COLOR_INDEX -> {
-                int javaColorIndex = readNumber(entityData).intValue();
+                final int javaColorIndex = readNumber(entityData).intValue();
 
                 switch (entity.javaType()) {
                     case WOLF, CAT -> {
@@ -395,11 +396,11 @@ public class EntityMetadataRewriter {
                 }
             }
             case OWNER -> {
-                long ownerId = readNumber(entityData).longValue();
+                final long ownerId = readNumber(entityData).longValue();
                 if (ownerId == -1) {
                     break; // No owner
                 }
-                Entity ownerEntity = entityTracker.getEntityByUid(ownerId);
+                final Entity ownerEntity = entityTracker.getEntityByUid(ownerId);
                 if (ownerEntity == null) {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find owner entity with id " + ownerId + " for entity " + entity.type());
                     break;
@@ -411,7 +412,7 @@ public class EntityMetadataRewriter {
                 }
             }
             case FUSE_TIME -> {
-                int fuseTime = readNumber(entityData).intValue();
+                final int fuseTime = readNumber(entityData).intValue();
                 if (entity.javaType().is(EntityTypes26_3.TNT)) {
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.FUSE), VersionedTypes.V26_3.entityDataTypes().varIntType, fuseTime));
                 } else {
@@ -419,7 +420,7 @@ public class EntityMetadataRewriter {
                 }
             }
             case AIR_SUPPLY -> { // Air supply is stored as a short in Bedrock, but an int in Java (Bedrock also has a max air supply value we ignore for now)
-                int airSupply = readNumber(entityData).intValue();
+                final int airSupply = readNumber(entityData).intValue();
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.AIR_SUPPLY), VersionedTypes.V26_3.entityDataTypes().varIntType, airSupply));
             }
             case POSE_INDEX -> {
@@ -433,14 +434,14 @@ public class EntityMetadataRewriter {
 
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.CLIENT_FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, javaBitMask));
 
-                int poseIndex = readNumber(entityData).intValue();
+                final int poseIndex = readNumber(entityData).intValue();
 
-                EulerAngle headPose;
-                EulerAngle bodyPose;
-                EulerAngle leftArmPose;
-                EulerAngle rightArmPose;
-                EulerAngle leftLegPose;
-                EulerAngle rightLegPose;
+                final EulerAngle headPose;
+                final EulerAngle bodyPose;
+                final EulerAngle leftArmPose;
+                final EulerAngle rightArmPose;
+                final EulerAngle leftLegPose;
+                final EulerAngle rightLegPose;
 
                 //Poses from https://github.com/lpsmods/armor-stand-poses/blob/1.21/datapack/datapack/data/poses/function/armor_stand/defaults.mcfunction
                 switch (poseIndex) {
@@ -568,7 +569,7 @@ public class EntityMetadataRewriter {
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.RIGHT_LEG_POSE), VersionedTypes.V26_3.entityDataTypes().rotationsType, rightLegPose));
             }
             case PUFFED_STATE -> {
-                int javaPuffedState = readNumber(entityData).intValue();
+                final int javaPuffedState = readNumber(entityData).intValue();
                 if (entity.javaType().is(EntityTypes26_3.PUFFERFISH)) {
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.PUFF_STATE), VersionedTypes.V26_3.entityDataTypes().varIntType, javaPuffedState));
                 } else {
@@ -576,16 +577,16 @@ public class EntityMetadataRewriter {
                 }
             }
             case FREEZING_EFFECT_STRENGTH -> {
-                float freezingStrength = readNumber(entityData).floatValue();
+                final float freezingStrength = readNumber(entityData).floatValue();
 
                 // Java freezing strength is from 0-140 whereas Bedrock is from 0.0-1.0
-                int javaStrength = Math.round(freezingStrength * 140f);
+                final int javaStrength = Math.round(freezingStrength * 140f);
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TICKS_FROZEN), VersionedTypes.V26_3.entityDataTypes().varIntType, javaStrength));
             }
             case GOAT_HORN_COUNT -> {
                 if (entity.javaType().is(EntityTypes26_3.GOAT)) {
                     // In bedrock the goat always loses its right horn first, whereas in java its random
-                    int hornCount = readNumber(entityData).intValue();
+                    final int hornCount = readNumber(entityData).intValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.HAS_LEFT_HORN), VersionedTypes.V26_3.entityDataTypes().booleanType, hornCount != 0));
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.HAS_RIGHT_HORN), VersionedTypes.V26_3.entityDataTypes().booleanType, hornCount == 2));
                 } else {
@@ -593,7 +594,7 @@ public class EntityMetadataRewriter {
                 }
             }
             case EATING_COUNTER -> {
-                int eatingCounter = readNumber(entityData).intValue();
+                final int eatingCounter = readNumber(entityData).intValue();
                 if (entity.javaType().is(EntityTypes26_3.PANDA)) {
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.EAT_COUNTER), VersionedTypes.V26_3.entityDataTypes().varIntType, eatingCounter));
                 } else if (eatingCounter != 0) {
@@ -602,7 +603,7 @@ public class EntityMetadataRewriter {
             }
             case ATTACH_FACE -> {
                 if (entity.javaType().is(EntityTypes26_3.SHULKER)) {
-                    int javaAttachFace = readNumber(entityData).intValue();
+                    final int javaAttachFace = readNumber(entityData).intValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.ATTACH_FACE), VersionedTypes.V26_3.entityDataTypes().directionType, javaAttachFace));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received ATTACH_FACE for non-SHULKER entity " + entity.type());
@@ -610,7 +611,7 @@ public class EntityMetadataRewriter {
             }
             case PEEK_ID -> {
                 if (entity.javaType().is(EntityTypes26_3.SHULKER)) {
-                    byte peek = readNumber(entityData).byteValue();
+                    final byte peek = readNumber(entityData).byteValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.PEEK), VersionedTypes.V26_3.entityDataTypes().byteType, peek));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received PEEK_ID for non-SHULKER entity " + entity.type());
@@ -623,7 +624,7 @@ public class EntityMetadataRewriter {
             }
             case DATA_RADIUS -> {
                 if (entity.javaType().isOrHasParent(EntityTypes26_3.AREA_EFFECT_CLOUD)) {
-                    float radius = readNumber(entityData).floatValue();
+                    final float radius = readNumber(entityData).floatValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.RADIUS), VersionedTypes.V26_3.entityDataTypes().floatType, radius));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received DATA_RADIUS for non-AREA_EFFECT_CLOUD entity " + entity.type());
@@ -631,7 +632,7 @@ public class EntityMetadataRewriter {
             }
             case DATA_WAITING -> {
                 if (entity.javaType().is(EntityTypes26_3.AREA_EFFECT_CLOUD)) {
-                    boolean isWaiting = (boolean) entityData.getValue();
+                    final boolean isWaiting = (boolean) entityData.getValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.WAITING), VersionedTypes.V26_3.entityDataTypes().booleanType, isWaiting));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received DATA_WAITING for non-AREA_EFFECT_CLOUD entity " + entity.type());
@@ -639,14 +640,14 @@ public class EntityMetadataRewriter {
             }
             case DATA_PARTICLE -> {
                 if (entity.javaType().is(EntityTypes26_3.AREA_EFFECT_CLOUD)) {
-                    int particle_id_or_colour = readNumber(entityData).intValue(); //TODO: not sure what this is exactly
+                    // final int particleIdOrColour = readNumber(entityData).intValue(); //TODO: not sure what this is exactly
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received DATA_PARTICLE for non-AREA_EFFECT_CLOUD entity " + entity.type());
                 }
             }
             case VALUE -> { // TODO: Test
                 if (entity.javaType().is(EntityTypes26_3.EXPERIENCE_ORB)) {
-                    int exp = readNumber(entityData).intValue();
+                    final int exp = readNumber(entityData).intValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.VALUE), VersionedTypes.V26_3.entityDataTypes().varIntType, exp));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received VALUE for non-EXPERIENCE_ORB entity " + entity.type());
@@ -655,8 +656,6 @@ public class EntityMetadataRewriter {
             case AUX_POWER -> {
                 if (entity.javaType().is(EntityTypes26_3.ARROW)) {
                     // Potion aux value used for an Arrow's trail. (Equal to the potion ID - 1)
-                    int potionId = readNumber(entityData).byteValue() + 1;
-
                     // TODO: Find potion by id and get color
                     //javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.EFFECT_COLOR), VersionedTypes.V26_3.entityDataTypes().varIntType, to_do));
                 } else {
@@ -665,7 +664,7 @@ public class EntityMetadataRewriter {
             }
             case INV -> {
                 if (entity.javaType().is(EntityTypes26_3.WITHER)) {
-                    int invulnerabilityTicks = readNumber(entityData).intValue();
+                    final int invulnerabilityTicks = readNumber(entityData).intValue();
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.INV), VersionedTypes.V26_3.entityDataTypes().varIntType, invulnerabilityTicks));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received INV for non-WITHER entity " + entity.type());
@@ -673,71 +672,71 @@ public class EntityMetadataRewriter {
             }
             case TARGET_A -> {
                 if (entity.javaType().is(EntityTypes26_3.WITHER)) {
-                    long targetAId = readNumber(entityData).longValue();
-                    if (targetAId == -1) {
+                    final long targetFirstId = readNumber(entityData).longValue();
+                    if (targetFirstId == -1) {
                         break; // No target
                     }
-                    Entity targetAEntity = entityTracker.getEntityByUid(targetAId);
-                    if (targetAEntity == null) {
-                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET_A entity with id " + targetAId + " for entity " + entity.type());
+                    final Entity targetFirstEntity = entityTracker.getEntityByUid(targetFirstId);
+                    if (targetFirstEntity == null) {
+                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET_A entity with id " + targetFirstId + " for entity " + entity.type());
                         break;
                     }
-                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TARGET_A), VersionedTypes.V26_3.entityDataTypes().varIntType, targetAEntity.javaId()));
+                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TARGET_A), VersionedTypes.V26_3.entityDataTypes().varIntType, targetFirstEntity.javaId()));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received TARGET_A for non-WITHER entity " + entity.type());
                 }
             }
             case TARGET_B -> {
                 if (entity.javaType().is(EntityTypes26_3.WITHER)) {
-                    long targetBId = readNumber(entityData).longValue();
-                    if (targetBId == -1) {
+                    final long targetSecondId = readNumber(entityData).longValue();
+                    if (targetSecondId == -1) {
                         break; // No target
                     }
-                    Entity targetBEntity = entityTracker.getEntityByUid(targetBId);
-                    if (targetBEntity == null) {
-                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET_B entity with id " + targetBId + " for entity " + entity.type());
+                    final Entity targetSecondEntity = entityTracker.getEntityByUid(targetSecondId);
+                    if (targetSecondEntity == null) {
+                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET_B entity with id " + targetSecondId + " for entity " + entity.type());
                         break;
                     }
-                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TARGET_B), VersionedTypes.V26_3.entityDataTypes().varIntType, targetBEntity.javaId()));
+                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TARGET_B), VersionedTypes.V26_3.entityDataTypes().varIntType, targetSecondEntity.javaId()));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received TARGET_B for non-WITHER entity " + entity.type());
                 }
             }
             case TARGET_C -> {
                 if (entity.javaType().is(EntityTypes26_3.WITHER)) {
-                    long targetCId = readNumber(entityData).longValue();
-                    if (targetCId == -1) {
+                    final long targetThirdId = readNumber(entityData).longValue();
+                    if (targetThirdId == -1) {
                         break; // No target
                     }
-                    Entity targetCEntity = entityTracker.getEntityByUid(targetCId);
-                    if (targetCEntity == null) {
-                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET_C entity with id " + targetCId + " for entity " + entity.type());
+                    final Entity targetThirdEntity = entityTracker.getEntityByUid(targetThirdId);
+                    if (targetThirdEntity == null) {
+                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET_C entity with id " + targetThirdId + " for entity " + entity.type());
                         break;
                     }
-                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TARGET_C), VersionedTypes.V26_3.entityDataTypes().varIntType, targetCEntity.javaId()));
+                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.TARGET_C), VersionedTypes.V26_3.entityDataTypes().varIntType, targetThirdEntity.javaId()));
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received TARGET_C for non-WITHER entity " + entity.type());
                 }
             }
             case TARGET -> {
-                long targetId = readNumber(entityData).longValue();
+                final long targetId = readNumber(entityData).longValue();
                 if (entity.javaType().is(EntityTypes26_3.GUARDIAN)) {
                     if (targetId == 0) {
                         break; // No target
                     }
-                    Entity targetEntity = entityTracker.getEntityByUid(targetId);
+                    final Entity targetEntity = entityTracker.getEntityByUid(targetId);
                     if (targetEntity == null) {
                         ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find TARGET entity with id " + targetId + " for entity " + entity.type());
                         break;
                     }
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.ATTACK_TARGET), VersionedTypes.V26_3.entityDataTypes().varIntType, targetEntity.javaId()));
-                } else if (targetId != 0)  {
+                } else if (targetId != 0) {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received TARGET for non-GUARDIAN entity " + entity.type() + " with non-zero value " + targetId);
                 }
             }
-            case BLOCK_TARGET ->  {
+            case BLOCK_TARGET -> {
                 if (entity.javaType().is(EntityTypes26_3.END_CRYSTAL)) {
-                    BlockPosition blockPosition = (BlockPosition) entityData.getValue(); // TODO: Test
+                    final BlockPosition blockPosition = (BlockPosition) entityData.getValue(); // TODO: Test
 
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.BEAM_TARGET), VersionedTypes.V26_3.entityDataTypes().optionalBlockPositionType, blockPosition));
                 } else {
@@ -745,19 +744,22 @@ public class EntityMetadataRewriter {
                 }
             }
             case RESERVED_038 -> { // SCALE
-                float scale = readNumber(entityData).floatValue();
+                final float scale = readNumber(entityData).floatValue();
 
                 // TODO: Armor stands might have special handling
 
                 if (entity.javaType().isOrHasParent(EntityTypes26_3.LIVING_ENTITY) && scale != 0f) {
-                    LivingEntity livingEntity = (LivingEntity) entity;
+                    final LivingEntity livingEntity = (LivingEntity) entity;
 
                     livingEntity.updateAttributes(new EntityAttribute("minecraft:scale", scale, (float) 1 / 16, 16));
                 }
             }
-            case RESERVED_053 -> {} // BOUNDING_BOX_WIDTH
-            case RESERVED_054 -> {} // BOUNDING_BOX_HEIGHT
-            case AGENT, BALLOON_ANCHOR -> {} // Education edition only, ignore
+            case RESERVED_053 -> {
+            } // BOUNDING_BOX_WIDTH
+            case RESERVED_054 -> {
+            } // BOUNDING_BOX_HEIGHT
+            case AGENT, BALLOON_ANCHOR -> {
+            } // Education edition only, ignore
             default -> {
                 return false;
             }
@@ -768,16 +770,16 @@ public class EntityMetadataRewriter {
 
     public static void rewriteProperties(final UserConnection user, final Entity entity, final EntityProperties properties, final List<EntityData> javaEntityData) {
         final EntityPropertyTracker epTracker = user.get(EntityPropertyTracker.class);
-        CompoundTag registries = BedrockProtocol.MAPPINGS.getJavaRegistries();
-        EntityPropertyList expectedProperties = epTracker.getEntityProperties(entity.type());
+        final CompoundTag registries = BedrockProtocol.MAPPINGS.getJavaRegistries();
+        final EntityPropertyList expectedProperties = epTracker.getEntityProperties(entity.type());
         if (expectedProperties == null) {
             //ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Failed to find expected properties for entity " + entity.type());
             return;
         }
 
-        Iterator<EntityProperty> intIterator = expectedProperties.intProperties().iterator();
+        final Iterator<EntityProperty> intIterator = expectedProperties.intProperties().iterator();
 
-        for (int i: properties.intProperties().values()) {
+        for (int i : properties.intProperties().values()) {
             if (!intIterator.hasNext()) {
                 ViaBedrock.getPlatform().getLogger().warning("Received more integer properties than expected for entity " + entity.type());
                 break;
@@ -785,7 +787,7 @@ public class EntityMetadataRewriter {
             final EntityProperty property = intIterator.next();
 
             if (property instanceof EntityProperty.BooleanProperty booleanProperty) {
-                boolean value = i != 0;
+                final boolean value = i != 0;
 
                 switch (booleanProperty.identifier()) {
                     case "minecraft:can_move" -> {
@@ -796,8 +798,8 @@ public class EntityMetadataRewriter {
                         }
                     }
                     case "minecraft:has_nectar" -> {
-                        if  (entity.javaType().is(EntityTypes26_3.BEE)) {
-                            byte bitmask = value ? (byte) 0x08 : 0; // TODO
+                        if (entity.javaType().is(EntityTypes26_3.BEE)) {
+                            final byte bitmask = value ? (byte) 0x08 : 0; // TODO
 
                             javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, bitmask));
                         } else {
@@ -807,7 +809,7 @@ public class EntityMetadataRewriter {
                     default -> ViaBedrock.getPlatform().getLogger().warning("Received boolean property " + booleanProperty.identifier() + " for entity " + entity.type() + " with value " + value);
                 }
             } else if (property instanceof EntityProperty.IntProperty integerProperty) {
-                int value = i;
+                final int value = i;
 
                 ViaBedrock.getPlatform().getLogger().warning("Received int property " + integerProperty.identifier() + " for entity " + entity.type() + " with value " + value);
             } else if (property instanceof EntityProperty.EnumProperty enumProperty) {
@@ -815,13 +817,13 @@ public class EntityMetadataRewriter {
                     ViaBedrock.getPlatform().getLogger().warning("Received invalid value " + i + " for enum property " + enumProperty.identifier() + " on entity " + entity.type());
                     continue;
                 }
-                String value = enumProperty.possibleValues()[i];
+                final String value = enumProperty.possibleValues()[i];
 
                 switch (enumProperty.identifier()) {
                     case "minecraft:climate_variant" -> {
-                        String namespacedVariant = Key.namespaced(value);
+                        final String namespacedVariant = Key.namespaced(value);
 
-                        String registryName = switch (entity.javaType()) {
+                        final String registryName = switch (entity.javaType()) {
                             case CHICKEN -> "minecraft:chicken_variant";
                             case COW -> "minecraft:cow_variant";
                             case PIG -> "minecraft:pig_variant";
@@ -830,7 +832,7 @@ public class EntityMetadataRewriter {
                                 yield null;
                             }
                         };
-                        EntityDataType variantType = switch (entity.javaType()) {
+                        final EntityDataType variantType = switch (entity.javaType()) {
                             case CHICKEN -> VersionedTypes.V26_3.entityDataTypes().chickenVariantType;
                             case COW -> VersionedTypes.V26_3.entityDataTypes().cowVariantType;
                             case PIG -> VersionedTypes.V26_3.entityDataTypes().pigVariantType;
@@ -838,8 +840,8 @@ public class EntityMetadataRewriter {
                         };
 
                         if (registryName != null && variantType != null) {
-                            CompoundTag variantRegistry = registries.getCompoundTag(registryName);
-                            int javaVariant = registryIndex(variantRegistry, namespacedVariant);
+                            final CompoundTag variantRegistry = registries.getCompoundTag(registryName);
+                            final int javaVariant = registryIndex(variantRegistry, namespacedVariant);
 
                             if (javaVariant != -1) {
                                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.VARIANT), variantType, javaVariant));
@@ -849,9 +851,9 @@ public class EntityMetadataRewriter {
                         }
                     }
                     case "minecraft:sound_variant" -> {
-                        String namespacedVariant = Key.namespaced(value);
+                        final String namespacedVariant = Key.namespaced(value);
 
-                        String registryName = switch (entity.javaType()) {
+                        final String registryName = switch (entity.javaType()) {
                             case CHICKEN -> "minecraft:chicken_sound_variant";
                             case COW -> "minecraft:cow_sound_variant";
                             case PIG -> "minecraft:pig_sound_variant";
@@ -862,7 +864,7 @@ public class EntityMetadataRewriter {
                                 yield null;
                             }
                         };
-                        EntityDataType variantType = switch (entity.javaType()) {
+                        final EntityDataType variantType = switch (entity.javaType()) {
                             case CHICKEN -> VersionedTypes.V26_3.entityDataTypes().chickenSoundVariant;
                             case COW -> VersionedTypes.V26_3.entityDataTypes().cowSoundVariant;
                             case PIG -> VersionedTypes.V26_3.entityDataTypes().pigSoundVariant;
@@ -872,8 +874,8 @@ public class EntityMetadataRewriter {
                         };
 
                         if (registryName != null && variantType != null) {
-                            CompoundTag variantRegistry = registries.getCompoundTag(registryName);
-                            int javaVariant = registryIndex(variantRegistry, namespacedVariant);
+                            final CompoundTag variantRegistry = registries.getCompoundTag(registryName);
+                            final int javaVariant = registryIndex(variantRegistry, namespacedVariant);
 
                             if (javaVariant != -1) {
                                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SOUND_VARIANT), variantType, javaVariant));
@@ -884,7 +886,7 @@ public class EntityMetadataRewriter {
                     }
                     case "minecraft:chest_interaction" -> {
                         if (entity.javaType().is(EntityTypes26_3.COPPER_GOLEM)) {
-                            int state = switch (value) {
+                            final int state = switch (value) {
                                 case "none" -> 0; // IDLE
                                 case "take" -> 1; // GETTING_ITEM
                                 case "take_fail" -> 2; // GETTING_NO_ITEM
@@ -904,7 +906,7 @@ public class EntityMetadataRewriter {
                     }
                     case "minecraft:oxidation_level" -> {
                         if (entity.javaType().is(EntityTypes26_3.COPPER_GOLEM)) {
-                            int state = switch (value) {
+                            final int state = switch (value) {
                                 case "unoxidized" -> 0; // UNAFFECTED
                                 case "exposed" -> 1; // EXPOSED
                                 case "weathered" -> 2; // WEATHERED
@@ -926,7 +928,7 @@ public class EntityMetadataRewriter {
             }
         }
 
-        Iterator<EntityProperty.FloatProperty> floatIterator = expectedProperties.floatProperties().iterator();
+        final Iterator<EntityProperty.FloatProperty> floatIterator = expectedProperties.floatProperties().iterator();
 
         for (float value : properties.floatProperties().values()) {
             if (!floatIterator.hasNext()) {
@@ -954,7 +956,7 @@ public class EntityMetadataRewriter {
         return -1;
     }
 
-    private static Number readNumber(EntityData data) {
+    private static Number readNumber(final EntityData data) {
         if (data.dataType() == null || data.getValue() == null) {
             throw new IllegalArgumentException("EntityData " + data.id() + " has null data type or value");
         }
@@ -967,4 +969,8 @@ public class EntityMetadataRewriter {
             default -> throw new IllegalArgumentException("Unsupported number type: " + data.dataType());
         };
     }
+
+    private EntityMetadataRewriter() {
+    }
+
 }

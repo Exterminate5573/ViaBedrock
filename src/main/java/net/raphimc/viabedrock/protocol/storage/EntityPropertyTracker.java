@@ -26,16 +26,16 @@ public class EntityPropertyTracker extends StoredObject {
 
     private final Object2ObjectOpenHashMap<String, EntityPropertyList> entities = new Object2ObjectOpenHashMap<>();
 
-    public EntityPropertyTracker(UserConnection user) {
+    public EntityPropertyTracker(final UserConnection user) {
         super(user);
     }
 
-    public void addEntity(String entityId, EntityPropertyList properties) {
-        entities.put(entityId, properties);
+    public void addEntity(final String entityId, final EntityPropertyList properties) {
+        this.entities.put(entityId, properties);
     }
 
-    public EntityPropertyList getEntityProperties(String entityId) {
-        return entities.get(entityId);
+    public EntityPropertyList getEntityProperties(final String entityId) {
+        return this.entities.get(entityId);
     }
 
 }

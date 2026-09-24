@@ -19,9 +19,16 @@ package net.raphimc.viabedrock.protocol.model.entity;
 
 public interface EntityProperty {
 
-    record BooleanProperty(String identifier) implements EntityProperty {}
-    record IntProperty(String identifier, int minValue, int maxValue) implements EntityProperty {}
-    record FloatProperty(String identifier, float minValue, float maxValue) implements EntityProperty {}
-    record EnumProperty(String identifier, String[] possibleValues) implements EntityProperty {}
+    record BooleanProperty(String identifier) implements EntityProperty {
+    }
+
+    record IntProperty(String identifier, int minValue, int maxValue) implements EntityProperty {
+    }
+
+    record FloatProperty(String identifier, float minValue, float maxValue) implements EntityProperty {
+    }
+
+    record EnumProperty(String identifier, String[] possibleValues) implements EntityProperty {
+    }
 
 }

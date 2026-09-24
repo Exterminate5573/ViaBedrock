@@ -55,7 +55,11 @@ import net.raphimc.viabedrock.protocol.data.enums.java.Relative;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.EquipmentSlot;
 import net.raphimc.viabedrock.protocol.data.generated.java.EntityDataFields;
 import net.raphimc.viabedrock.protocol.data.generated.java.RegistryKeys;
-import net.raphimc.viabedrock.protocol.model.*;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.model.EntityAttribute;
+import net.raphimc.viabedrock.protocol.model.EntityEffect;
+import net.raphimc.viabedrock.protocol.model.EntityProperties;
+import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.EntityPropertyTracker;
@@ -67,7 +71,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
-public class EntityPackets {
+public final class EntityPackets {
 
     private static final int INTERPOLATION_STEP_TICKS = 3;
     private static final float PAINTING_POS_OFFSET = -0.46875F;
@@ -94,8 +98,8 @@ public class EntityPackets {
                 attributes[i] = new EntityAttribute(name, currentValue, minValue, maxValue);
             }
             final EntityData[] entityData = wrapper.read(BedrockTypes.ENTITY_DATA_ARRAY); // entity data
-            final EntityProperties entityProperties = wrapper.read(BedrockTypes.ENTITY_PROPERTIES); // entity properties
-            final EntityLink[] entityLinks = wrapper.read(BedrockTypes.ENTITY_LINK_ARRAY); // entity links
+            wrapper.read(BedrockTypes.ENTITY_PROPERTIES); // entity properties
+            wrapper.read(BedrockTypes.ENTITY_LINK_ARRAY); // entity links
 
             final Entity entity;
             final EntityTypes26_3 javaEntityType = BedrockProtocol.MAPPINGS.getBedrockToJavaEntities().get(type);
@@ -652,27 +656,27 @@ public class EntityPackets {
 
             final EntityPropertyTracker epTracker = wrapper.user().get(EntityPropertyTracker.class);
 
-            String entityType = ((CompoundTag)tag).getString("type");
-            List<EntityProperty> intEntityProperties = new ArrayList<>();
-            List<EntityProperty.FloatProperty> floatEntityProperties = new ArrayList<>();
+            final String entityType = ((CompoundTag) tag).getString("type");
+            final List<EntityProperty> intEntityProperties = new ArrayList<>();
+            final List<EntityProperty.FloatProperty> floatEntityProperties = new ArrayList<>();
 
-            ListTag<CompoundTag> properties = ((CompoundTag)tag).getListTag("properties", CompoundTag.class);
+            final ListTag<CompoundTag> properties = ((CompoundTag) tag).getListTag("properties", CompoundTag.class);
             for (CompoundTag property : properties) {
-                EntityProperty newProperty = switch (property.getInt("type")) {
+                final EntityProperty newProperty = switch (property.getInt("type")) {
                     case 0 -> new EntityProperty.IntProperty(
                             property.getString("name"),
                             property.getInt("min"),
                             property.getInt("max")
                     );
-                    case 1 ->  new EntityProperty.FloatProperty(
+                    case 1 -> new EntityProperty.FloatProperty(
                             property.getString("name"),
                             property.getFloat("min"),
                             property.getFloat("max")
                     );
-                    case 2 ->  new EntityProperty.BooleanProperty(
+                    case 2 -> new EntityProperty.BooleanProperty(
                             property.getString("name")
                     );
-                    case 3 ->  new EntityProperty.EnumProperty(
+                    case 3 -> new EntityProperty.EnumProperty(
                             property.getString("name"),
                             property.getListTag("enum", StringTag.class).stream().map(StringTag::getValue).toArray(String[]::new)
                     );
@@ -693,6 +697,9 @@ public class EntityPackets {
 
             epTracker.addEntity(entityType, new EntityPropertyList(intEntityProperties, floatEntityProperties));
         });
+    }
+
+    private EntityPackets() {
     }
 
 }
