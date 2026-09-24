@@ -39,10 +39,10 @@ import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.api.util.PacketFactory;
-import net.raphimc.viabedrock.experimental.model.inventory.BedrockInventoryTransaction;
-import net.raphimc.viabedrock.experimental.model.inventory.InventoryActionData;
-import net.raphimc.viabedrock.experimental.model.inventory.InventorySource;
-import net.raphimc.viabedrock.experimental.model.inventory.InventoryTransactionData;
+import net.raphimc.viabedrock.protocol.model.inventory.BedrockInventoryTransaction;
+import net.raphimc.viabedrock.protocol.model.inventory.InventoryActionData;
+import net.raphimc.viabedrock.protocol.model.inventory.InventorySource;
+import net.raphimc.viabedrock.protocol.model.inventory.InventoryTransactionData;
 import net.raphimc.viabedrock.experimental.model.map.MapDecoration;
 import net.raphimc.viabedrock.experimental.model.map.MapObject;
 import net.raphimc.viabedrock.experimental.model.map.MapTrackedObject;
@@ -50,14 +50,14 @@ import net.raphimc.viabedrock.api.util.TextUtil;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
 import net.raphimc.viabedrock.experimental.model.container.block.*;
 import net.raphimc.viabedrock.experimental.model.container.player.InventoryContainer;
-import net.raphimc.viabedrock.experimental.model.inventory.*;
+import net.raphimc.viabedrock.protocol.model.inventory.*;
 import net.raphimc.viabedrock.experimental.model.recipe.*;
-import net.raphimc.viabedrock.experimental.rewriter.InventoryTransactionRewriter;
-import net.raphimc.viabedrock.experimental.storage.MapTracker;
+import net.raphimc.viabedrock.protocol.rewriter.InventoryTransactionRewriter;
+import net.raphimc.viabedrock.protocol.storage.MapTracker;
 import net.raphimc.viabedrock.experimental.util.JavaMapPaletteUtil;
-import net.raphimc.viabedrock.experimental.storage.*;
+import net.raphimc.viabedrock.protocol.storage.*;
 import net.raphimc.viabedrock.experimental.tasks.ExperimentalInventoryTrackerTickTask;
-import net.raphimc.viabedrock.experimental.types.ExperimentalBedrockTypes;
+import net.raphimc.viabedrock.protocol.types.InventoryTypes;
 import net.raphimc.viabedrock.experimental.util.ProtocolUtil;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
@@ -277,7 +277,7 @@ public class ExperimentalFeatures {
             }
 
             // The bedrock client will send a start item use on action to the server first.
-            ExperimentalPacketFactory.sendBedrockPlayerAction(
+            PlayerActionPacketFactory.sendBedrockPlayerAction(
                     wrapper.user(),
                     clientPlayer.runtimeId(),
                     PlayerActionType.StartItemUseOn,
@@ -329,7 +329,7 @@ public class ExperimentalFeatures {
             transactionPacket.sendToServer(BedrockProtocol.class);
 
             // Bedrock sends a stop item use on after the transaction packet
-            ExperimentalPacketFactory.sendBedrockPlayerAction(
+            PlayerActionPacketFactory.sendBedrockPlayerAction(
                     wrapper.user(),
                     clientPlayer.runtimeId(),
                     PlayerActionType.StopItemUseOn,
@@ -360,7 +360,7 @@ public class ExperimentalFeatures {
                     interact.write(BedrockTypes.UNSIGNED_VAR_LONG, wrapper.user().get(EntityTracker.class).getClientPlayer().runtimeId()); // target entity runtime id
                     interact.write(BedrockTypes.OPTIONAL_POSITION_3F, null); // position
                     interact.sendToServer(BedrockProtocol.class);
-                    ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                    PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
                 }
 
                 wrapper.cancel();
@@ -368,9 +368,9 @@ public class ExperimentalFeatures {
             }
             if (!container.handleClick(revision, slot, button, action)) {
                 if (container.type() != ContainerType.INVENTORY) {
-                    ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                    PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
                 }
-                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
+                PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
             }
         }, true);
         protocol.registerServerbound(ServerboundPackets26_1.CONTAINER_BUTTON_CLICK, null, wrapper -> {
@@ -390,9 +390,9 @@ public class ExperimentalFeatures {
             }
             if (!container.handleButtonClick(button)) {
                 if (container.type() != ContainerType.INVENTORY) {
-                    ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                    PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
                 }
-                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
+                PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
             }
         }, true);
         protocol.registerServerbound(ServerboundPackets26_1.SET_CREATIVE_MODE_SLOT, null, wrapper -> {
@@ -405,7 +405,7 @@ public class ExperimentalFeatures {
                 wrapper.cancel();
                 return;
             }
-            ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+            PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
         }, true);
         protocol.registerServerbound(ServerboundPackets26_1.CONTAINER_CLOSE, ServerboundBedrockPackets.CONTAINER_CLOSE, new PacketHandlers() {
             @Override
@@ -608,7 +608,7 @@ public class ExperimentalFeatures {
             final ExperimentalInventoryTracker inventoryTracker = wrapper.user().get(ExperimentalInventoryTracker.class);
             final ExperimentalContainer container = inventoryTracker.getContainerClientbound((byte) containerId, containerName, storageItem);
             if (container != null && container.setItems(items)) {
-                ExperimentalPacketFactory.writeJavaContainerSetContent(wrapper, container);
+                PlayerActionPacketFactory.writeJavaContainerSetContent(wrapper, container);
             } else {
                 wrapper.cancel();
             }
@@ -656,7 +656,7 @@ public class ExperimentalFeatures {
                 switch (recipeType) {
                     case SHAPELESS, USER_DATA_SHAPELESS, SHAPELESS_CHEMISTRY -> {
                         final String recipeId = wrapper.read(BedrockTypes.STRING);
-                        final List<ItemDescriptor> ingredients = List.of(wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTORS));
+                        final List<ItemDescriptor> ingredients = List.of(wrapper.read(InventoryTypes.ITEM_DESCRIPTORS));
                         final List<BedrockItem> results = List.of(wrapper.read(itemRewriter.itemInstanceArrayType()));
                         final UUID recipeUuid = wrapper.read(BedrockTypes.UUID);
                         final String recipeTag = wrapper.read(BedrockTypes.STRING);
@@ -666,7 +666,7 @@ public class ExperimentalFeatures {
                         if (recipeType == RecipeType.SHAPELESS || recipeType == RecipeType.USER_DATA_SHAPELESS) {
                             final byte unlock = wrapper.read(Types.BYTE);
                             if (unlock == 0) {
-                                wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTORS);
+                                wrapper.read(InventoryTypes.ITEM_DESCRIPTORS);
                             }
                         }
 
@@ -686,7 +686,7 @@ public class ExperimentalFeatures {
                         final ItemDescriptor[][] ingredients = new ItemDescriptor[height][width];
                         for (int row = 0; row < height; row++) {
                             for (int col = 0; col < width; col++) {
-                                ingredients[row][col] = wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTOR_TYPE);
+                                ingredients[row][col] = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
                             }
                         }
 
@@ -700,7 +700,7 @@ public class ExperimentalFeatures {
                         if (recipeType == RecipeType.SHAPED) {
                             final byte unlock = wrapper.read(Types.BYTE);
                             if (unlock == 0) {
-                                wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTORS);
+                                wrapper.read(InventoryTypes.ITEM_DESCRIPTORS);
                             }
                         }
 
@@ -730,9 +730,9 @@ public class ExperimentalFeatures {
                     }
                     case SMITHING_TRANSFORM, SMITHING_TRIM -> {
                         final String recipeId = wrapper.read(BedrockTypes.STRING);
-                        final ItemDescriptor template = wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTOR_TYPE);
-                        final ItemDescriptor base = wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTOR_TYPE);
-                        final ItemDescriptor addition = wrapper.read(ExperimentalBedrockTypes.ITEM_DESCRIPTOR_TYPE);
+                        final ItemDescriptor template = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
+                        final ItemDescriptor base = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
+                        final ItemDescriptor addition = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
                         BedrockItem result = BedrockItem.empty();
                         if (recipeType == RecipeType.SMITHING_TRANSFORM) {
                             result = wrapper.read(itemRewriter.itemInstanceType());
@@ -771,7 +771,7 @@ public class ExperimentalFeatures {
             wrapper.cancel();
             ExperimentalInventoryTracker inventoryTracker = wrapper.user().get(ExperimentalInventoryTracker.class);
             InventoryRequestTracker inventoryRequestTracker = wrapper.user().get(InventoryRequestTracker.class);
-            ItemStackResponseInfo[] infoList = wrapper.read(ExperimentalBedrockTypes.ITEM_STACK_RESPONSES);
+            ItemStackResponseInfo[] infoList = wrapper.read(InventoryTypes.ITEM_STACK_RESPONSES);
 
             // Resync the inventory content based on the response
             for (ItemStackResponseInfo info : infoList) {
@@ -790,7 +790,7 @@ public class ExperimentalFeatures {
                         ExperimentalContainer newContainer = inventoryTracker.getContainerClientbound(container.containerId(), null, null);
                         if (newContainer == null) continue;
                         newContainer.setItems(container.getItems().clone());
-                        ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), newContainer);  // Resync the container content on Java side
+                        PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), newContainer);  // Resync the container content on Java side
                     }
                     continue;
                 }
@@ -823,10 +823,10 @@ public class ExperimentalFeatures {
                 }
 
                 for (ExperimentalContainer container : mismatchedContainers) {
-                    ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), container);  // Resync the container content on Java side
+                    PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), container);  // Resync the container content on Java side
                 }
                 // Force resync cursor
-                ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
             }
         });
         protocol.registerClientbound(ClientboundBedrockPackets.CONTAINER_SET_DATA, ClientboundPackets26_1.CONTAINER_SET_DATA, wrapper -> {
@@ -926,7 +926,7 @@ public class ExperimentalFeatures {
             if (inventoryTracker.isContainerOpen()) {
                 inventoryTracker.setCurrentContainerClosed(true);
             }
-            ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer()); // Java client always resets inventory on respawn. Resend it
+            PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer()); // Java client always resets inventory on respawn. Resend it
             inventoryTracker.getInventoryContainer().sendSelectedHotbarSlotToClient(); // Java client always resets selected hotbar slot on respawn. Resend it
         });
         protocol.registerClientbound(ClientboundBedrockPackets.INVENTORY_TRANSACTION, null, wrapper -> {
@@ -948,7 +948,7 @@ public class ExperimentalFeatures {
 
                         if (container != null) {
                             container.setItem(action.slot(), action.toItem());
-                            ExperimentalPacketFactory.sendJavaContainerSetContent(wrapper.user(),  container);
+                            PlayerActionPacketFactory.sendJavaContainerSetContent(wrapper.user(),  container);
                         } else {
                             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received inventory action for unknown container ID: " + action.source().containerId());
                         }
@@ -1218,7 +1218,7 @@ public class ExperimentalFeatures {
         }
 
         if (gameRulesStorage.getGameRule("keepInventory")) {
-            ExperimentalPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer()); // Java client always resets inventory on respawn. Resend it
+            PlayerActionPacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer()); // Java client always resets inventory on respawn. Resend it
         }
         inventoryTracker.getInventoryContainer().sendSelectedHotbarSlotToClient(); // Java client always resets selected hotbar slot on respawn. Resend it
     }

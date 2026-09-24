@@ -25,14 +25,14 @@ import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
 import net.raphimc.viabedrock.ViaBedrock;
-import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
+import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.experimental.model.recipe.RecipeType;
 import net.raphimc.viabedrock.experimental.model.recipe.SmithingRecipe;
-import net.raphimc.viabedrock.experimental.storage.*;
+import net.raphimc.viabedrock.protocol.storage.*;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
@@ -214,7 +214,7 @@ public class SmithingContainer extends ExperimentalContainer {
         );
 
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
+        PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
 
         inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
 
@@ -242,7 +242,7 @@ public class SmithingContainer extends ExperimentalContainer {
         }
         this.setItem(MATERIAL_SLOT, materialItem);
 
-        ExperimentalPacketFactory.sendJavaContainerSetContent(user, this);
+        PlayerActionPacketFactory.sendJavaContainerSetContent(user, this);
 
         //TODO: Re-Update the output slot
         return true;

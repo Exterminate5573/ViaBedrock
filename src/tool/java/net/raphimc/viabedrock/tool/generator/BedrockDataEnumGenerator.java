@@ -18,119 +18,55 @@
 package net.raphimc.viabedrock.tool.generator;
 
 import com.viaversion.viaversion.libs.gson.Gson;
+import com.viaversion.viaversion.libs.gson.JsonArray;
 import com.viaversion.viaversion.libs.gson.JsonElement;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import net.raphimc.viabedrock.codegen.CodeGen;
 import net.raphimc.viabedrock.codegen.model.Javadoc;
 import net.raphimc.viabedrock.codegen.model.member.impl.Field;
 import net.raphimc.viabedrock.codegen.model.type.impl.Enum;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
+import net.raphimc.viabedrock.tool.ToolArgs;
+import net.raphimc.viabedrock.tool.ToolPaths;
 
-import java.io.File;
-import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 public class BedrockDataEnumGenerator {
 
-    private static final String ENUMS_URL = "https://raw.githubusercontent.com/Mojang/bedrock-protocol-docs/ba81d713aa983bb6bc26fe662a9934c5de1838a5/html/enums.html";
-    private static final List<String> IGNORED_FIELDS = Arrays.asList("deprecated", "count", "_count", "total", "all", "numenchantments", "invalidenchantment", "numtagtypes", "abilitycount", "nummodes", "input_num", "total_operations", "total_operands", "numvalidversions", "num_categories", "max_disconnect_fail_reason", "numshapetypes");
-    private static final Map<String, String> VALUE_REPLACEMENTS = new HashMap<>();
-    private static final Pattern NUMBER_PATTERN = Pattern.compile("^\\d+$");
-
-    static {
-        VALUE_REPLACEMENTS.put("std::numeric_limits::max()", "Integer.MAX_VALUE");
-        VALUE_REPLACEMENTS.put("std::numeric_limits<uint32_t>::max()", "Integer.MAX_VALUE");
-        VALUE_REPLACEMENTS.put("std::numeric_limits::min()", "Integer.MIN_VALUE");
-        VALUE_REPLACEMENTS.put("std::numeric_limits<uint32_t>::min()", "Integer.MIN_VALUE");
-        VALUE_REPLACEMENTS.put("NonTerminalBit", "0");
-    }
-
     public static void main(String[] args) throws Throwable {
-        final Map<String, List<EnumField>> enums = new HashMap<>();
-        final Document doc = Jsoup.parse(new URL(ENUMS_URL), 10_000);
-        for (Element element : doc.selectXpath("/html/body/table/tbody/tr")) {
-            final Elements tableElements = element.select("td");
-            if (tableElements.isEmpty()) continue;
+        final ToolArgs toolArgs = ToolArgs.parse(args);
+        final Path jsonDir = ToolPaths.protocolDocsDir(toolArgs);
+        final Gson gson = new Gson();
 
-            final String enumName = tableElements.get(0).ownText();
+        final CodeGen codeGen = new CodeGen(ToolPaths.MAIN_JAVA.toFile(), "net.raphimc.viabedrock.protocol.data.enums.bedrock.generated");
 
-            if (enumName.equalsIgnoreCase("SharedTypes::Legacy::LevelSoundEvent")) {
-                //Parse to new json file
-                final Map<String, String> enumFields = new TreeMap<>();
-                for (Element fieldTableRowElement : tableElements.get(1).selectXpath("table/tbody/tr")) {
-                    final Elements valueElements = fieldTableRowElement.select("td");
-                    String fieldName = valueElements.get(0).ownText();
-                    final String fieldValue = valueElements.get(1).ownText();
+        final List<Path> jsonFiles;
+        try (Stream<Path> files = Files.list(jsonDir)) {
+            jsonFiles = files.filter(file -> file.getFileName().toString().endsWith(".json")).sorted().toList();
+        }
+        if (jsonFiles.isEmpty()) {
+            throw new IllegalStateException("No enum definitions found in " + jsonDir);
+        }
 
-                    fieldName = fieldName.replace(" ", "");
+        for (Path file : jsonFiles) {
+            final JsonObject jsonObject = gson.fromJson(Files.readString(file), JsonObject.class);
 
-                    enumFields.put(fieldName, fieldValue);
-                }
-
-                final String json = new Gson().newBuilder().setPrettyPrinting().disableHtmlEscaping().serializeNulls().create().toJson(enumFields);
-                Files.writeString(new File("level_sound_events.json").toPath(), json);
+            if (!jsonObject.has("enum")) {
                 continue;
             }
 
-            final Map<String, EnumField> enumFields = new LinkedHashMap<>();
-            for (Element fieldTableRowElement : tableElements.get(1).selectXpath("table/tbody/tr")) {
-                final Elements valueElements = fieldTableRowElement.select("td");
-                String fieldName = valueElements.get(0).ownText();
-                final String fieldValue = valueElements.get(1).ownText();
-                final List<String> fieldComments = Arrays.stream(valueElements.get(2).wholeOwnText().split("\n")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+            final String enumName = jsonObject.get("title").getAsString()
+                    .replace("::", "_").replace(" ", "_").replace("-", "_");
 
-                fieldName = fieldName.replace(" ", "");
-
-                enumFields.put(fieldName, new EnumField(fieldName, fieldValue, fieldComments));
+            if (enumName.equalsIgnoreCase("LevelSoundEvent")) {
+                // Skip this enum, we already have a custom implementation for it
+                continue;
             }
 
-            final Map<String, EnumField> originalEnumFields = new LinkedHashMap<>(enumFields);
-            enumFields.values().removeIf(field -> IGNORED_FIELDS.contains(field.name.toLowerCase(Locale.ROOT)));
-            enumFields.values().removeIf(field -> NUMBER_PATTERN.matcher(field.name).matches());
-            for (EnumField field : enumFields.values()) {
-                if (VALUE_REPLACEMENTS.containsKey(field.value)) {
-                    field.value = VALUE_REPLACEMENTS.get(field.value);
-                }
-            }
-            final Map<String, EnumField> valueToFieldMap = new HashMap<>();
-            for (EnumField field : enumFields.values()) {
-                if (valueToFieldMap.containsKey(field.value)) {
-                    field.value = valueToFieldMap.get(field.value).name;
-                } else {
-                    valueToFieldMap.put(field.value, field);
-                }
-            }
-            for (EnumField field : enumFields.values()) {
-                if (!enumFields.containsKey(field.value) && originalEnumFields.containsKey(field.value) && !NUMBER_PATTERN.matcher(field.value).matches()) {
-                    field.value = originalEnumFields.get(field.value).value;
-                }
-            }
-            enums.put(enumName, new ArrayList<>(enumFields.values()));
-        }
-
-        // Mojang seems to have pushed an outdated version of this enum. Those values exist in 1.21.50, but not in 1.21.60
-        final List<EnumField> levelEventEnum = enums.get("LevelEvent");
-        levelEventEnum.add(new EnumField("ParticleCreakingHeartTrail", "9816"));
-
-        // Fix wrong values
-        final List<EnumField> packetCompressionAlgorithmEnum = enums.get("PacketCompressionAlgorithm");
-        packetCompressionAlgorithmEnum.removeIf(field -> field.name.equals("None"));
-        packetCompressionAlgorithmEnum.add(new EnumField("None", "0xFF"));
-
-        final CodeGen codeGen = new CodeGen(new File("src/main/java"), "net.raphimc.viabedrock.protocol.data.enums.bedrock.generated");
-
-        for (Map.Entry<String, List<EnumField>> enumEntry : enums.entrySet()) {
-            String rawEnumName = enumEntry.getKey().replace("::", "_");
-            if (Character.isLowerCase(rawEnumName.charAt(0))) {
-                rawEnumName = Character.toUpperCase(rawEnumName.charAt(0)) + rawEnumName.substring(1);
-            }
-            final String enumName = rawEnumName;
             final Enum genEnum = new Enum(enumName);
+
             genEnum.imports().add("com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectMap");
             genEnum.imports().add("com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap");
 
@@ -185,43 +121,26 @@ public class BedrockDataEnumGenerator {
 
             genEnum.members().addMethod("public", "int", "getValue", method -> method.code().add("return this.value;"));
 
-            for (EnumField enumField : enumEntry.getValue()) {
-                genEnum.enumFields().add(new Field(enumField.getName(), null, null, enumField.getValue(), new Javadoc(enumField.getComments())));
+
+            JsonArray enumFields = jsonObject.getAsJsonArray("enum");
+            for (int i = 0; i < enumFields.size(); i++) {
+                JsonElement enumFieldElement = enumFields.get(i);
+                String name = enumFieldElement.getAsString().replace(" ", "_");
+                String value = null;
+                if (jsonObject.has("x-enum-binary-value")) {
+                    JsonArray binaryValues = jsonObject.getAsJsonArray("x-enum-binary-value");
+                    if (binaryValues.size() > i) {
+                        value = binaryValues.get(i).getAsString();
+                    }
+                }
+
+                genEnum.enumFields().add(new Field(name, null, null, value, new Javadoc()));
             }
             codeGen.addType(genEnum);
         }
 
         codeGen.generate();
-    }
-
-    private static class EnumField {
-
-        private final String name;
-        private String value;
-        private final List<String> comments;
-
-        public EnumField(final String name, final String value) {
-            this(name, value, Collections.emptyList());
-        }
-
-        public EnumField(final String name, final String value, final List<String> comments) {
-            this.name = name;
-            this.value = value;
-            this.comments = comments;
-        }
-
-        public String getName() {
-            return this.name;
-        }
-
-        public String getValue() {
-            return this.value;
-        }
-
-        public List<String> getComments() {
-            return this.comments;
-        }
-
+        System.out.println("Generated " + jsonFiles.size() + " enums from " + jsonDir);
     }
 
 }

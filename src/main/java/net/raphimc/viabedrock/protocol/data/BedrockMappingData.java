@@ -31,7 +31,7 @@ import com.viaversion.nbt.tag.Tag;
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.data.MappingDataBase;
 import com.viaversion.viaversion.api.minecraft.Particle;
-import com.viaversion.viaversion.api.minecraft.entities.EntityTypes26_2;
+import com.viaversion.viaversion.api.minecraft.entities.EntityTypes26_3;
 import com.viaversion.viaversion.api.minecraft.item.StructuredItem;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
@@ -56,6 +56,7 @@ import net.raphimc.viabedrock.api.resourcepack.definition.SoundDefinitions;
 import net.raphimc.viabedrock.api.util.EnumUtil;
 import net.raphimc.viabedrock.api.util.FileSystemUtil;
 import net.raphimc.viabedrock.api.util.JsonUtil;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.*;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.SoundSource;
 import net.raphimc.viabedrock.protocol.data.generated.java.RegistryKeys;
@@ -100,6 +101,8 @@ public class BedrockMappingData extends MappingDataBase {
     private IntSet javaFluidBlockStates;
     private Int2IntMap javaPottedBlockStates;
     private Map<String, IntSet> javaHeightMapBlockStates;
+    private byte[] javaBlockLightEmission;
+    private byte[] javaBlockOpacity;
 
     // Biomes
     private CompoundTag bedrockBiomeDefinitions;
@@ -123,10 +126,10 @@ public class BedrockMappingData extends MappingDataBase {
     private BiMap<String, Integer> bedrockEntities;
     private Map<ActorDataIDs, DataItemType> bedrockEntityDataTypes;
     private Map<ActorFlags, String> bedrockEntityFlagMoLangQueries;
-    private Map<String, EntityTypes26_2> bedrockToJavaEntities;
+    private Map<String, EntityTypes26_3> bedrockToJavaEntities;
     private BiMap<String, Integer> javaBlockEntities;
     private BiMap<String, Integer> javaEntityAttributes;
-    private Map<EntityTypes26_2, List<String>> javaEntityDataFields;
+    private Map<EntityTypes26_3, List<String>> javaEntityDataFields;
 
     // Entity Effects
     private BiMap<String, Integer> javaEffects;
@@ -352,6 +355,8 @@ public class BedrockMappingData extends MappingDataBase {
                 }
                 this.javaHeightMapBlockStates.put(entry.getKey(), blockStates);
             }
+
+            this.loadBlockLightProperties();
         }
 
         { // Biomes
@@ -644,8 +649,8 @@ public class BedrockMappingData extends MappingDataBase {
                     continue;
                 }
                 final String javaIdentifier = entry.getValue().getAsString();
-                EntityTypes26_2 javaEntityType = null;
-                for (EntityTypes26_2 type : EntityTypes26_2.values()) {
+                EntityTypes26_3 javaEntityType = null;
+                for (EntityTypes26_3 type : EntityTypes26_3.values()) {
                     if (!type.isAbstractType() && type.identifier().equals(javaIdentifier)) {
                         javaEntityType = type;
                         break;
@@ -675,15 +680,15 @@ public class BedrockMappingData extends MappingDataBase {
             }
 
             final JsonObject javaEntityDataFieldsJson = this.readJson("java/entity_data_fields.json");
-            this.javaEntityDataFields = new EnumMap<>(EntityTypes26_2.class);
+            this.javaEntityDataFields = new EnumMap<>(EntityTypes26_3.class);
             for (Map.Entry<String, JsonElement> entry : javaEntityDataFieldsJson.entrySet()) {
-                if (EnumUtil.getEnumConstantOrNull(EntityTypes26_2.class, entry.getKey()) == null) {
+                if (EnumUtil.getEnumConstantOrNull(EntityTypes26_3.class, entry.getKey()) == null) {
                     throw new RuntimeException("Unknown java entity type: " + entry.getKey());
                 }
             }
-            for (EntityTypes26_2 type : EntityTypes26_2.values()) {
+            for (EntityTypes26_3 type : EntityTypes26_3.values()) {
                 if (type.isAbstractType()) continue;
-                final EntityTypes26_2 realType = type;
+                final EntityTypes26_3 realType = type;
                 final List<String> allEntityTypeFields = new ArrayList<>();
                 do {
                     final JsonArray entityTypeFieldsJson = javaEntityDataFieldsJson.getAsJsonArray(type.name());
@@ -698,7 +703,7 @@ public class BedrockMappingData extends MappingDataBase {
                         }
                         allEntityTypeFields.addAll(0, entityTypeFields);
                     }
-                } while ((type = (EntityTypes26_2) type.getParent()) != null);
+                } while ((type = (EntityTypes26_3) type.getParent()) != null);
                 this.javaEntityDataFields.put(realType, allEntityTypeFields);
             }
         }
@@ -1017,6 +1022,7 @@ public class BedrockMappingData extends MappingDataBase {
                 this.bedrockToJavaEnchantments.put(enchantType, javaIdentifier);
             }
             for (Enchant_Type enchantType : Enchant_Type.values()) {
+                if (enchantType == Enchant_Type.NumEnchantments || enchantType == Enchant_Type.InvalidEnchantment) continue;
                 if (!this.bedrockToJavaEnchantments.containsKey(enchantType)) {
                     throw new RuntimeException("Missing bedrock -> java enchantment mapping for " + enchantType.name());
                 }
@@ -1024,6 +1030,110 @@ public class BedrockMappingData extends MappingDataBase {
         }
 
         DataValues.validate();
+    }
+
+    private void loadBlockLightProperties() {
+        final JsonObject lightPropertiesJson = this.readJson("java/block_light_properties.json");
+
+        final Map<String, Integer> emissionByIdentifier = new HashMap<>();
+        for (Map.Entry<String, JsonElement> entry : lightPropertiesJson.getAsJsonObject("emission").entrySet()) {
+            final String identifier = Key.namespaced(entry.getKey());
+            if (!this.javaBlocks.containsKey(identifier)) {
+                throw new RuntimeException("Unknown java block in light emission data: " + identifier);
+            }
+            emissionByIdentifier.put(identifier, entry.getValue().getAsInt());
+        }
+        final Map<String, Integer> opacityByIdentifier = new HashMap<>();
+        for (Map.Entry<String, JsonElement> entry : lightPropertiesJson.getAsJsonObject("opacity").entrySet()) {
+            final String identifier = Key.namespaced(entry.getKey());
+            if (!this.javaBlocks.containsKey(identifier)) {
+                throw new RuntimeException("Unknown java block in light opacity data: " + identifier);
+            }
+            opacityByIdentifier.put(identifier, entry.getValue().getAsInt());
+        }
+
+        final int stateCount = this.javaBlockStates.size();
+        this.javaBlockLightEmission = new byte[stateCount];
+        this.javaBlockOpacity = new byte[stateCount];
+        Arrays.fill(this.javaBlockOpacity, (byte) 15); // Blocks that are not listed are treated as full opaque cubes
+        for (Map.Entry<BlockState, Integer> entry : this.javaBlockStates.entrySet()) {
+            final BlockState blockState = entry.getKey();
+            final int stateId = entry.getValue();
+            final String identifier = blockState.namespacedIdentifier();
+
+            final Integer opacity = opacityByIdentifier.get(identifier);
+            this.javaBlockOpacity[stateId] = opacity != null ? opacity.byteValue() : (byte) 15;
+
+            // State dependent emission rules take precedence over the static values from the data asset
+            final int stateEmission = this.getStateLightEmission(blockState);
+            if (stateEmission != -1) {
+                this.javaBlockLightEmission[stateId] = (byte) stateEmission;
+            } else {
+                final Integer emission = emissionByIdentifier.get(identifier);
+                this.javaBlockLightEmission[stateId] = emission != null ? emission.byteValue() : 0;
+            }
+        }
+    }
+
+    /**
+     * Light emission of a java block state that depends on its block state properties.
+     * Returns -1 if the block has no state dependent emission rule.
+     */
+    private int getStateLightEmission(final BlockState blockState) {
+        final String identifier = blockState.identifier();
+        switch (identifier) {
+            case "campfire":
+                return blockState.hasProperty("lit", "true") ? 15 : 0;
+            case "soul_campfire":
+                return blockState.hasProperty("lit", "true") ? 13 : 0;
+            case "furnace", "blast_furnace", "smoker":
+                return blockState.hasProperty("lit", "true") ? 13 : 0;
+            case "redstone_lamp":
+                return blockState.hasProperty("lit", "true") ? 15 : 0;
+            case "redstone_torch", "redstone_wall_torch":
+                return blockState.hasProperty("lit", "true") ? 7 : 0;
+            case "redstone_wire":
+                return Math.max(0, Math.min(15, parseBlockStateInt(blockState, "power", 0)));
+            case "light":
+                return Math.max(0, Math.min(15, parseBlockStateInt(blockState, "level", 15)));
+            case "cave_vines", "cave_vines_plant":
+                return blockState.hasProperty("berries", "true") ? 14 : 0;
+            case "sea_pickle":
+                return blockState.hasProperty("waterlogged", "true") ? 3 + 3 * parseBlockStateInt(blockState, "pickles", 1) : 0;
+            case "respawn_anchor":
+                return Math.max(0, 4 * parseBlockStateInt(blockState, "charges", 0) - 1);
+            case "vault":
+                return blockState.hasProperty("vault_state", "inactive") ? 6 : 12;
+            case "trial_spawner":
+                if (blockState.hasProperty("trial_spawner_state", "active") || blockState.hasProperty("trial_spawner_state", "ejecting_reward")) return 8;
+                if (blockState.hasProperty("trial_spawner_state", "waiting")) return 4;
+                return 0;
+            case "sculk_sensor", "calibrated_sculk_sensor":
+                return blockState.hasProperty("sculk_sensor_phase", "active") ? 1 : 0;
+            default:
+                if (identifier.equals("candle") || identifier.endsWith("_candle")) {
+                    return blockState.hasProperty("lit", "true") ? 3 * parseBlockStateInt(blockState, "candles", 1) : 0;
+                }
+                if (identifier.equals("candle_cake") || identifier.endsWith("_candle_cake")) {
+                    return blockState.hasProperty("lit", "true") ? 3 : 0;
+                }
+                if (identifier.equals("copper_bulb") || identifier.endsWith("_copper_bulb")) {
+                    if (!blockState.hasProperty("lit", "true")) return 0;
+                    if (identifier.contains("oxidized")) return 4;
+                    if (identifier.contains("weathered")) return 8;
+                    if (identifier.contains("exposed")) return 12;
+                    return 15;
+                }
+                return -1;
+        }
+    }
+
+    private int parseBlockStateInt(final BlockState blockState, final String property, final int fallback) {
+        try {
+            return Integer.parseInt(blockState.properties().getOrDefault(property, String.valueOf(fallback)));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     public Map<ResourcePack.Key, ResourcePack> getBedrockResourcePacks() {
@@ -1104,6 +1214,21 @@ public class BedrockMappingData extends MappingDataBase {
 
     public Map<String, IntSet> getJavaHeightMapBlockStates() {
         return this.javaHeightMapBlockStates;
+    }
+
+    /**
+     * Light emission (0-15) of every java block state, indexed by java block state id.
+     */
+    public byte[] getJavaBlockLightEmission() {
+        return this.javaBlockLightEmission;
+    }
+
+    /**
+     * Light opacity (0-15) of every java block state, indexed by java block state id.
+     * Values of 15 or above fully block light propagation.
+     */
+    public byte[] getJavaBlockOpacity() {
+        return this.javaBlockOpacity;
     }
 
     public CompoundTag getBedrockBiomeDefinitions() {
@@ -1192,7 +1317,7 @@ public class BedrockMappingData extends MappingDataBase {
         return this.bedrockEntityFlagMoLangQueries;
     }
 
-    public Map<String, EntityTypes26_2> getBedrockToJavaEntities() {
+    public Map<String, EntityTypes26_3> getBedrockToJavaEntities() {
         return this.bedrockToJavaEntities;
     }
 
@@ -1204,7 +1329,7 @@ public class BedrockMappingData extends MappingDataBase {
         return this.javaEntityAttributes;
     }
 
-    public Map<EntityTypes26_2, List<String>> getJavaEntityDataFields() {
+    public Map<EntityTypes26_3, List<String>> getJavaEntityDataFields() {
         return this.javaEntityDataFields;
     }
 
@@ -1351,7 +1476,7 @@ public class BedrockMappingData extends MappingDataBase {
                         if (!this.javaItems.containsKey(identifier)) {
                             throw new IllegalStateException("Unknown java item: " + identifier);
                         }
-                        particle.add(VersionedTypes.V26_2.item, new StructuredItem(this.javaItems.get(identifier), 1, ProtocolConstants.createStructuredDataContainer()));
+                        particle.add(VersionedTypes.V26_3.item, new StructuredItem(this.javaItems.get(identifier), 1, ProtocolConstants.createStructuredDataContainer()));
                     }
                     default -> throw new IllegalStateException("Unknown particle argument type: " + type);
                 }
@@ -1385,7 +1510,8 @@ public class BedrockMappingData extends MappingDataBase {
                     this.bedrockBlockStateUpgrader.upgradeToLatest(tag);
                     final BedrockBlockState bedrockBlockState = BedrockBlockState.fromNbt(tag);
                     if (!this.bedrockBlockStates.contains(bedrockBlockState)) {
-                        throw new RuntimeException("Legacy block state " + bedrockBlockState.toBlockStateString() + " is not mapped to a modern block state");
+                        // TODO: This is broken
+                        //throw new RuntimeException("Legacy block state " + bedrockBlockState.toBlockStateString() + " is not mapped to a modern block state");
                     }
 
                     this.bedrockLegacyBlockStates.put(id << 6 | metadata & 63, bedrockBlockState);

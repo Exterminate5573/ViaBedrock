@@ -25,7 +25,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;

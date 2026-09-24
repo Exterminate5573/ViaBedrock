@@ -22,7 +22,7 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.util.Pair;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;

@@ -21,14 +21,14 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import net.raphimc.viabedrock.ViaBedrock;
-import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
+import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
-import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
-import net.raphimc.viabedrock.experimental.storage.InventoryRequestStorage;
-import net.raphimc.viabedrock.experimental.storage.InventoryRequestTracker;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
+import net.raphimc.viabedrock.protocol.storage.ExperimentalInventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
+import net.raphimc.viabedrock.protocol.storage.InventoryRequestTracker;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
@@ -167,7 +167,7 @@ public class AnvilContainer extends ExperimentalContainer {
             inventoryTracker.getHudContainer().setItem(0, resultItem);
 
             inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-            ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
+            PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
         } else {
             return false;
         }

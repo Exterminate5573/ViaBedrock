@@ -20,7 +20,7 @@ package net.raphimc.viabedrock.experimental.model.container.player;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.item.Item;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 
 public abstract class InventoryRedirectContainer extends ExperimentalContainer {

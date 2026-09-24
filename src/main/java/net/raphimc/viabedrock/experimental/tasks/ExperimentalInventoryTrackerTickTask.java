@@ -19,7 +19,7 @@ package net.raphimc.viabedrock.experimental.tasks;
 
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.api.connection.UserConnection;
-import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.ExperimentalInventoryTracker;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 
 public class ExperimentalInventoryTrackerTickTask implements Runnable {

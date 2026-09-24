@@ -26,15 +26,15 @@ import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import com.viaversion.viaversion.protocols.v1_20_3to1_20_5.data.Enchantments1_20_5;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.util.RegistryUtil;
-import net.raphimc.viabedrock.experimental.ExperimentalPacketFactory;
+import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestAction;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.experimental.model.inventory.ItemStackRequestSlotInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.experimental.model.recipe.EnchantData;
-import net.raphimc.viabedrock.experimental.storage.ExperimentalInventoryTracker;
-import net.raphimc.viabedrock.experimental.storage.InventoryRequestStorage;
-import net.raphimc.viabedrock.experimental.storage.InventoryRequestTracker;
+import net.raphimc.viabedrock.protocol.storage.ExperimentalInventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
+import net.raphimc.viabedrock.protocol.storage.InventoryRequestTracker;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
@@ -158,7 +158,7 @@ public class EnchantmentContainer extends ExperimentalContainer {
         );
 
         inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, 0, prevCursorContainer, prevContainers)); // Store the request to track it later
-        ExperimentalPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
+        PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[] {request});
 
         return true;
     }
@@ -169,7 +169,7 @@ public class EnchantmentContainer extends ExperimentalContainer {
         // Send to java client
         for (int i = 0; i < Math.min(this.data.size(), 3); i++) {
             EnchantData d = this.data.get(i);
-            ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) d.cost());
+            PlayerActionPacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) d.cost());
 
             String javaEnchant = BedrockProtocol.MAPPINGS.getBedrockToJavaEnchantments().get(d.type());
             // Update the java item with the enchantment
@@ -180,13 +180,13 @@ public class EnchantmentContainer extends ExperimentalContainer {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Enchantment entry is null for enchantment " + javaEnchant);
                 } else {
                     int javaId = RegistryUtil.getRegistryIndex(enchantmentsRegistry, enchantmentEntry);
-                    ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 4), (short) javaId);
+                    PlayerActionPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 4), (short) javaId);
                 }
             } else {
                 ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown enchantment with id " + d.type() + " and level " + d.level());
             }
 
-            ExperimentalPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) d.level());
+            PlayerActionPacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) d.level());
         }
 
     }
