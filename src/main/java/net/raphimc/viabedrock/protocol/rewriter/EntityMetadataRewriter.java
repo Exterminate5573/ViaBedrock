@@ -29,8 +29,8 @@ import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.api.model.entity.LivingEntity;
-import net.raphimc.viabedrock.experimental.model.entity.properties.EntityProperty;
-import net.raphimc.viabedrock.experimental.model.entity.properties.EntityPropertyList;
+import net.raphimc.viabedrock.protocol.model.entity.EntityProperty;
+import net.raphimc.viabedrock.protocol.model.entity.EntityPropertyList;
 import net.raphimc.viabedrock.protocol.storage.EntityPropertyTracker;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.ActorDataIDs;
@@ -778,6 +778,10 @@ public class EntityMetadataRewriter {
         Iterator<EntityProperty> intIterator = expectedProperties.intProperties().iterator();
 
         for (int i: properties.intProperties().values()) {
+            if (!intIterator.hasNext()) {
+                ViaBedrock.getPlatform().getLogger().warning("Received more integer properties than expected for entity " + entity.type());
+                break;
+            }
             final EntityProperty property = intIterator.next();
 
             if (property instanceof EntityProperty.BooleanProperty booleanProperty) {
@@ -807,6 +811,10 @@ public class EntityMetadataRewriter {
 
                 ViaBedrock.getPlatform().getLogger().warning("Received int property " + integerProperty.identifier() + " for entity " + entity.type() + " with value " + value);
             } else if (property instanceof EntityProperty.EnumProperty enumProperty) {
+                if (i < 0 || i >= enumProperty.possibleValues().length) {
+                    ViaBedrock.getPlatform().getLogger().warning("Received invalid value " + i + " for enum property " + enumProperty.identifier() + " on entity " + entity.type());
+                    continue;
+                }
                 String value = enumProperty.possibleValues()[i];
 
                 switch (enumProperty.identifier()) {
@@ -831,14 +839,7 @@ public class EntityMetadataRewriter {
 
                         if (registryName != null && variantType != null) {
                             CompoundTag variantRegistry = registries.getCompoundTag(registryName);
-                            // TODO: Could be cleaned up
-                            int javaVariant = -1;
-                            for (String key : variantRegistry.keySet()) {
-                                javaVariant++;
-                                if (key.equals(namespacedVariant)) {
-                                    break;
-                                }
-                            }
+                            int javaVariant = registryIndex(variantRegistry, namespacedVariant);
 
                             if (javaVariant != -1) {
                                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.VARIANT), variantType, javaVariant));
@@ -872,14 +873,7 @@ public class EntityMetadataRewriter {
 
                         if (registryName != null && variantType != null) {
                             CompoundTag variantRegistry = registries.getCompoundTag(registryName);
-                            // TODO: Could be cleaned up
-                            int javaVariant = -1;
-                            for (String key : variantRegistry.keySet()) {
-                                javaVariant++;
-                                if (key.equals(namespacedVariant)) {
-                                    break;
-                                }
-                            }
+                            int javaVariant = registryIndex(variantRegistry, namespacedVariant);
 
                             if (javaVariant != -1) {
                                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SOUND_VARIANT), variantType, javaVariant));
@@ -935,10 +929,29 @@ public class EntityMetadataRewriter {
         Iterator<EntityProperty.FloatProperty> floatIterator = expectedProperties.floatProperties().iterator();
 
         for (float value : properties.floatProperties().values()) {
+            if (!floatIterator.hasNext()) {
+                ViaBedrock.getPlatform().getLogger().warning("Received more float properties than expected for entity " + entity.type());
+                break;
+            }
             final EntityProperty.FloatProperty property = floatIterator.next();
 
             ViaBedrock.getPlatform().getLogger().warning("Received float property " + property.identifier() + " for entity " + entity.type() + " with value " + value);
         }
+    }
+
+    private static int registryIndex(final CompoundTag registry, final String name) {
+        if (registry == null) {
+            return -1;
+        }
+
+        int index = 0;
+        for (String key : registry.keySet()) {
+            if (key.equals(name)) {
+                return index;
+            }
+            index++;
+        }
+        return -1;
     }
 
     private static Number readNumber(EntityData data) {

@@ -20,15 +20,11 @@ package net.raphimc.viabedrock.protocol.storage;
 import com.viaversion.viaversion.api.connection.StoredObject;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.libs.fastutil.objects.Object2ObjectOpenHashMap;
-import net.raphimc.viabedrock.experimental.model.entity.properties.EntityProperty;
-import net.raphimc.viabedrock.experimental.model.entity.properties.EntityPropertyList;
-
-
-import java.util.List;
+import net.raphimc.viabedrock.protocol.model.entity.EntityPropertyList;
 
 public class EntityPropertyTracker extends StoredObject {
 
-    Object2ObjectOpenHashMap<String, EntityPropertyList> entities = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectOpenHashMap<String, EntityPropertyList> entities = new Object2ObjectOpenHashMap<>();
 
     public EntityPropertyTracker(UserConnection user) {
         super(user);
