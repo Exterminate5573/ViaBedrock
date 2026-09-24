@@ -17,8 +17,8 @@
  */
 package net.raphimc.viabedrock.protocol.model;
 
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.AbilitiesIndex;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.SerializedAbilitiesData_SerializedAbilitiesLayer;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.AbilitiesIndex;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.SerializedAbilitiesData_SerializedAbilitiesLayer;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -33,9 +33,9 @@ public record PlayerAbilities(long entityUniqueId, byte playerPermission, byte c
         final Set<AbilitiesIndex> abilitiesSet = EnumSet.allOf(AbilitiesIndex.class);
         abilitiesSet.remove(AbilitiesIndex.Invalid);
         this.abilityLayers.put(SerializedAbilitiesData_SerializedAbilitiesLayer.Base, new AbilitiesLayer(
-                abilitiesSet,
-                EnumSet.of(AbilitiesIndex.Build, AbilitiesIndex.Mine, AbilitiesIndex.DoorsAndSwitches, AbilitiesIndex.OpenContainers, AbilitiesIndex.AttackPlayers, AbilitiesIndex.AttackMobs),
-                0.1F, 0.05F, 1F
+            abilitiesSet,
+            EnumSet.of(AbilitiesIndex.Build, AbilitiesIndex.Mine, AbilitiesIndex.DoorsAndSwitches, AbilitiesIndex.OpenContainers, AbilitiesIndex.AttackPlayers, AbilitiesIndex.AttackMobs),
+            0.1F, 0.05F, 1F
         ));
     }
 

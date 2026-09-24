@@ -19,15 +19,20 @@ package net.raphimc.viabedrock.protocol.packet;
 
 import com.google.common.collect.Lists;
 import com.viaversion.nbt.tag.CompoundTag;
+import com.viaversion.nbt.tag.ListTag;
+import com.viaversion.nbt.tag.StringTag;
+import com.viaversion.nbt.tag.Tag;
 import com.viaversion.viaversion.api.minecraft.Holder;
 import com.viaversion.viaversion.api.minecraft.PaintingVariant;
 import com.viaversion.viaversion.api.minecraft.Vector3d;
-import com.viaversion.viaversion.api.minecraft.entities.EntityTypes1_21_11;
+import com.viaversion.viaversion.api.minecraft.entities.EntityTypes26_3;
 import com.viaversion.viaversion.api.minecraft.entitydata.EntityData;
+import com.viaversion.viaversion.api.minecraft.item.data.EnumTypes;
+import com.viaversion.viaversion.api.minecraft.item.data.SwingAnimation;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
@@ -39,6 +44,8 @@ import net.raphimc.viabedrock.api.util.MathUtil;
 import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.api.util.RegistryUtil;
 import net.raphimc.viabedrock.api.util.TextUtil;
+import net.raphimc.viabedrock.protocol.model.entity.EntityProperty;
+import net.raphimc.viabedrock.protocol.model.entity.EntityPropertyList;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.Direction;
@@ -48,9 +55,14 @@ import net.raphimc.viabedrock.protocol.data.enums.java.Relative;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.EquipmentSlot;
 import net.raphimc.viabedrock.protocol.data.generated.java.EntityDataFields;
 import net.raphimc.viabedrock.protocol.data.generated.java.RegistryKeys;
-import net.raphimc.viabedrock.protocol.model.*;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.model.EntityAttribute;
+import net.raphimc.viabedrock.protocol.model.EntityEffect;
+import net.raphimc.viabedrock.protocol.model.EntityProperties;
+import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
+import net.raphimc.viabedrock.protocol.storage.EntityPropertyTracker;
 import net.raphimc.viabedrock.protocol.storage.GameSessionStorage;
 import net.raphimc.viabedrock.protocol.storage.ResourcePackStorage;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
@@ -59,12 +71,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
-public class EntityPackets {
+public final class EntityPackets {
 
+    private static final int INTERPOLATION_STEP_TICKS = 3;
     private static final float PAINTING_POS_OFFSET = -0.46875F;
+    private static final SwingAnimation DEFAULT_SWING_ANIMATION = new SwingAnimation(EnumTypes.SWING_ANIMATION1_21_11.idFromName("whack"), 6);
 
     public static void register(final BedrockProtocol protocol) {
-        protocol.registerClientbound(ClientboundBedrockPackets.ADD_ENTITY, ClientboundPackets26_1.ADD_ENTITY, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.ADD_ENTITY, ClientboundPackets26_3.ADD_ENTITY, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
             final GameSessionStorage gameSession = wrapper.user().get(GameSessionStorage.class);
 
@@ -84,11 +98,11 @@ public class EntityPackets {
                 attributes[i] = new EntityAttribute(name, currentValue, minValue, maxValue);
             }
             final EntityData[] entityData = wrapper.read(BedrockTypes.ENTITY_DATA_ARRAY); // entity data
-            final EntityProperties entityProperties = wrapper.read(BedrockTypes.ENTITY_PROPERTIES); // entity properties
-            final EntityLink[] entityLinks = wrapper.read(BedrockTypes.ENTITY_LINK_ARRAY); // entity links
+            wrapper.read(BedrockTypes.ENTITY_PROPERTIES); // entity properties
+            wrapper.read(BedrockTypes.ENTITY_LINK_ARRAY); // entity links
 
             final Entity entity;
-            final EntityTypes1_21_11 javaEntityType = BedrockProtocol.MAPPINGS.getBedrockToJavaEntities().get(type);
+            final EntityTypes26_3 javaEntityType = BedrockProtocol.MAPPINGS.getBedrockToJavaEntities().get(type);
             if (javaEntityType != null) {
                 entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, type, javaEntityType);
             } else if (gameSession.getAvailableEntityIdentifiers().contains(type)) {
@@ -99,7 +113,7 @@ public class EntityPackets {
                         entity = new CustomEntity(wrapper.user(), entityUniqueId, entityRuntimeId, type, entityTracker.getNextJavaEntityId(), entityDefinition);
                         entityTracker.addEntity(entity);
                     } else {
-                        entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, type, EntityTypes1_21_11.PIG);
+                        entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, type, EntityTypes26_3.PIG);
                     }
                 } else {
                     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Missing bedrock entity type: " + type);
@@ -133,19 +147,19 @@ public class EntityPackets {
             }
             entity.updateEntityData(entityData);
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.ADD_ITEM_ENTITY, ClientboundPackets26_1.ADD_ENTITY, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.ADD_ITEM_ENTITY, ClientboundPackets26_3.ADD_ENTITY, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
             final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
 
             final long entityUniqueId = wrapper.read(BedrockTypes.VAR_LONG); // entity unique id
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
-            final BedrockItem item = wrapper.read(itemRewriter.itemType()); // item
+            final BedrockItem item = wrapper.read(itemRewriter.newItemType()); // item
             final Position3f position = wrapper.read(BedrockTypes.POSITION_3F); // position
             final Position3f motion = wrapper.read(BedrockTypes.POSITION_3F); // motion
             final EntityData[] entityData = wrapper.read(BedrockTypes.ENTITY_DATA_ARRAY); // entity data
             wrapper.read(Types.BOOLEAN); // from fishing
 
-            final Entity entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, "minecraft:item", EntityTypes1_21_11.ITEM);
+            final Entity entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, "minecraft:item", EntityTypes26_3.ITEM);
             entity.setPosition(position);
 
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
@@ -164,13 +178,13 @@ public class EntityPackets {
 
             final List<EntityData> javaEntityData = new ArrayList<>();
             entity.updateEntityData(entityData, javaEntityData);
-            javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.ITEM), VersionedTypes.V26_1.entityDataTypes.itemType, itemRewriter.javaItem(item)));
-            final PacketWrapper setEntityData = PacketWrapper.create(ClientboundPackets26_1.SET_ENTITY_DATA, wrapper.user());
+            javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.ITEM), VersionedTypes.V26_3.entityDataTypes.itemType, itemRewriter.javaItem(item)));
+            final PacketWrapper setEntityData = PacketWrapper.create(ClientboundPackets26_3.SET_ENTITY_DATA, wrapper.user());
             setEntityData.write(Types.VAR_INT, entity.javaId()); // entity id
-            setEntityData.write(VersionedTypes.V26_1.entityDataList, javaEntityData); // entity data
+            setEntityData.write(VersionedTypes.V26_3.entityDataList, javaEntityData); // entity data
             setEntityData.send(BedrockProtocol.class);
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.MOVE_ENTITY_ABSOLUTE, ClientboundPackets26_1.ENTITY_POSITION_SYNC, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.MOVE_ENTITY_ABSOLUTE, ClientboundPackets26_3.ENTITY_POSITION_SYNC, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
 
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
@@ -197,16 +211,16 @@ public class EntityPackets {
                 entity.setPosition(position);
 
                 if (teleported) {
-                    wrapper.setPacketType(ClientboundPackets26_1.PLAYER_POSITION);
+                    wrapper.setPacketType(ClientboundPackets26_3.PLAYER_POSITION);
                     entityTracker.getClientPlayer().writePlayerPositionPacketToClient(wrapper, Relative.union(Relative.ROTATION, Relative.VELOCITY), true);
                 } else { // force move local entity
                     wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
+                    wrapper.write(Types.VAR_INT, 1); // Stepped
+                    wrapper.write(Types.VAR_INT, 1); // 1 step
                     wrapper.write(Types.DOUBLE, (double) entity.position().x()); // x
                     wrapper.write(Types.DOUBLE, (double) entity.position().y() - entity.eyeOffset()); // y
                     wrapper.write(Types.DOUBLE, (double) entity.position().z()); // z
-                    wrapper.write(Types.DOUBLE, 0D); // velocity x
-                    wrapper.write(Types.DOUBLE, 0D); // velocity y
-                    wrapper.write(Types.DOUBLE, 0D); // velocity z
+                    wrapper.write(Types.VAR_INT, INTERPOLATION_STEP_TICKS);
                     wrapper.write(Types.FLOAT, entity.rotation().y()); // yaw
                     wrapper.write(Types.FLOAT, entity.rotation().x()); // pitch
                     wrapper.write(Types.BOOLEAN, entity.isOnGround()); // on ground
@@ -219,32 +233,39 @@ public class EntityPackets {
             entity.setOnGround(onGround);
 
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
+            wrapper.write(Types.VAR_INT, 1); // Stepped
+            wrapper.write(Types.VAR_INT, 1); // 1 step
             wrapper.write(Types.DOUBLE, (double) position.x()); // x
             wrapper.write(Types.DOUBLE, (double) position.y() - entity.eyeOffset()); // y
             wrapper.write(Types.DOUBLE, (double) position.z()); // z
-            wrapper.write(Types.DOUBLE, 0D); // velocity x
-            wrapper.write(Types.DOUBLE, 0D); // velocity y
-            wrapper.write(Types.DOUBLE, 0D); // velocity z
+            wrapper.write(Types.VAR_INT, INTERPOLATION_STEP_TICKS);
             wrapper.write(Types.FLOAT, yaw); // yaw
             wrapper.write(Types.FLOAT, pitch); // pitch
-            wrapper.write(Types.BOOLEAN, onGround); // on ground
+            wrapper.write(Types.BOOLEAN, entity.isOnGround()); // on ground
 
             PacketFactory.sendJavaRotateHead(wrapper.user(), entity);
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.MOVE_ENTITY_DELTA, ClientboundPackets26_1.ENTITY_POSITION_SYNC, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.MOVE_ENTITY_DELTA, ClientboundPackets26_3.ENTITY_POSITION_SYNC, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
 
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
-            final int flags = wrapper.read(BedrockTypes.UNSIGNED_SHORT_LE); // flags
-            final boolean hasX = (flags & 1) != 0;
-            final boolean hasY = (flags & 2) != 0;
-            final boolean hasZ = (flags & 4) != 0;
-            final boolean hasPitch = (flags & 8) != 0;
-            final boolean hasYaw = (flags & 16) != 0;
-            final boolean hasHeadYaw = (flags & 32) != 0;
-            final boolean onGround = (flags & 64) != 0;
-            final boolean teleported = (flags & 128) != 0; // If the position shouldn't be interpolated
-            final boolean forceMoveLocalEntity = (flags & 256) != 0;
+            final boolean hasX = wrapper.read(Types.BOOLEAN);
+            final float x = hasX ? wrapper.read(BedrockTypes.FLOAT_LE) : 0;
+            final boolean hasY = wrapper.read(Types.BOOLEAN);
+            final float y = hasY ? wrapper.read(BedrockTypes.FLOAT_LE) : 0;
+            final boolean hasZ = wrapper.read(Types.BOOLEAN);
+            final float z = hasZ ? wrapper.read(BedrockTypes.FLOAT_LE) : 0;
+            final boolean hasPitch = wrapper.read(Types.BOOLEAN);
+            final byte pitch = hasPitch ? wrapper.read(Types.BYTE) : 0;
+            final boolean hasYaw = wrapper.read(Types.BOOLEAN);
+            final byte yaw = hasYaw ? wrapper.read(Types.BYTE) : 0;
+            final boolean hasHeadYaw = wrapper.read(Types.BOOLEAN);
+            final byte headYaw = hasHeadYaw ? wrapper.read(Types.BYTE) : 0;
+            final boolean onGround = wrapper.read(Types.BOOLEAN);
+            final boolean teleported = wrapper.read(Types.BOOLEAN); // If the position shouldn't be interpolated
+            final boolean forceMoveLocalEntity = wrapper.read(Types.BOOLEAN);
+            wrapper.read(Types.BOOLEAN); // force completion
+            wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // ticks
 
             final Entity entity = entityTracker.getEntityByRid(entityRuntimeId);
             if (entity == null) {
@@ -258,32 +279,19 @@ public class EntityPackets {
                     return;
                 }
 
-                float x = 0F;
-                float y = 0F;
-                float z = 0F;
-                if (hasX) {
-                    x = wrapper.read(BedrockTypes.FLOAT_LE);
-                }
-                if (hasY) {
-                    y = wrapper.read(BedrockTypes.FLOAT_LE);
-                }
-                if (hasZ) {
-                    z = wrapper.read(BedrockTypes.FLOAT_LE);
-                }
                 entity.setPosition(new Position3f(x, y, z));
 
-                wrapper.clearPacket();
                 if (teleported) {
-                    wrapper.setPacketType(ClientboundPackets26_1.PLAYER_POSITION);
+                    wrapper.setPacketType(ClientboundPackets26_3.PLAYER_POSITION);
                     entityTracker.getClientPlayer().writePlayerPositionPacketToClient(wrapper, Relative.union(Relative.ROTATION, Relative.VELOCITY), true);
                 } else { // force move local entity
                     wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
+                    wrapper.write(Types.VAR_INT, 1); // Stepped
+                    wrapper.write(Types.VAR_INT, 1); // 1 step
                     wrapper.write(Types.DOUBLE, (double) entity.position().x()); // x
                     wrapper.write(Types.DOUBLE, (double) entity.position().y() - entity.eyeOffset()); // y
                     wrapper.write(Types.DOUBLE, (double) entity.position().z()); // z
-                    wrapper.write(Types.DOUBLE, 0D); // velocity x
-                    wrapper.write(Types.DOUBLE, 0D); // velocity y
-                    wrapper.write(Types.DOUBLE, 0D); // velocity z
+                    wrapper.write(Types.VAR_INT, INTERPOLATION_STEP_TICKS);
                     wrapper.write(Types.FLOAT, entity.rotation().y()); // yaw
                     wrapper.write(Types.FLOAT, entity.rotation().x()); // pitch
                     wrapper.write(Types.BOOLEAN, entity.isOnGround()); // on ground
@@ -292,38 +300,38 @@ public class EntityPackets {
             }
 
             if (hasX) {
-                entity.setPosition(new Position3f(wrapper.read(BedrockTypes.FLOAT_LE), entity.position().y(), entity.position().z()));
+                entity.setPosition(new Position3f(x, entity.position().y(), entity.position().z()));
             }
             if (hasY) {
-                entity.setPosition(new Position3f(entity.position().x(), wrapper.read(BedrockTypes.FLOAT_LE), entity.position().z()));
+                entity.setPosition(new Position3f(entity.position().x(), y, entity.position().z()));
             }
             if (hasZ) {
-                entity.setPosition(new Position3f(entity.position().x(), entity.position().y(), wrapper.read(BedrockTypes.FLOAT_LE)));
+                entity.setPosition(new Position3f(entity.position().x(), entity.position().y(), z));
             }
             if (hasPitch) {
-                entity.setRotation(new Position3f(MathUtil.byte2Float(wrapper.read(Types.BYTE)), entity.rotation().y(), entity.rotation().z()));
+                entity.setRotation(new Position3f(MathUtil.byte2Float(pitch), entity.rotation().y(), entity.rotation().z()));
             }
             if (hasYaw) {
-                entity.setRotation(new Position3f(entity.rotation().x(), MathUtil.byte2Float(wrapper.read(Types.BYTE)), entity.rotation().z()));
+                entity.setRotation(new Position3f(entity.rotation().x(), MathUtil.byte2Float(yaw), entity.rotation().z()));
             }
             if (hasHeadYaw) {
-                entity.setRotation(new Position3f(entity.rotation().x(), entity.rotation().y(), MathUtil.byte2Float(wrapper.read(Types.BYTE))));
+                entity.setRotation(new Position3f(entity.rotation().x(), entity.rotation().y(), MathUtil.byte2Float(headYaw)));
                 PacketFactory.sendJavaRotateHead(wrapper.user(), entity);
             }
             entity.setOnGround(onGround);
 
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
+            wrapper.write(Types.VAR_INT, 1); // Stepped
+            wrapper.write(Types.VAR_INT, 1); // 1 step
             wrapper.write(Types.DOUBLE, (double) entity.position().x()); // x
             wrapper.write(Types.DOUBLE, (double) entity.position().y() - entity.eyeOffset()); // y
             wrapper.write(Types.DOUBLE, (double) entity.position().z()); // z
-            wrapper.write(Types.DOUBLE, 0D); // velocity x
-            wrapper.write(Types.DOUBLE, 0D); // velocity y
-            wrapper.write(Types.DOUBLE, 0D); // velocity z
+            wrapper.write(Types.VAR_INT, INTERPOLATION_STEP_TICKS);
             wrapper.write(Types.FLOAT, entity.rotation().y()); // yaw
             wrapper.write(Types.FLOAT, entity.rotation().x()); // pitch
             wrapper.write(Types.BOOLEAN, entity.isOnGround()); // on ground
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.SET_ENTITY_MOTION, ClientboundPackets26_1.SET_ENTITY_MOTION, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.SET_ENTITY_MOTION, ClientboundPackets26_3.SET_ENTITY_MOTION, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
 
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
@@ -339,7 +347,7 @@ public class EntityPackets {
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
             wrapper.write(Types.LOW_PRECISION_VECTOR, new Vector3d(motion.x(), motion.y(), motion.z())); // velocity
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.REMOVE_ENTITY, ClientboundPackets26_1.REMOVE_ENTITIES, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.REMOVE_ENTITY, ClientboundPackets26_3.REMOVE_ENTITIES, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
             final long entityUniqueId = wrapper.read(BedrockTypes.VAR_LONG); // entity unique id
 
@@ -352,7 +360,7 @@ public class EntityPackets {
 
             wrapper.write(Types.VAR_INT_ARRAY_PRIMITIVE, new int[]{entity.javaId()}); // entity ids
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.ADD_PAINTING, ClientboundPackets26_1.ADD_ENTITY, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.ADD_PAINTING, ClientboundPackets26_3.ADD_ENTITY, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
             final GameSessionStorage gameSession = wrapper.user().get(GameSessionStorage.class);
             final CompoundTag paintingRegistry = gameSession.getJavaRegistries().getCompoundTag(RegistryKeys.PAINTING_VARIANT);
@@ -383,7 +391,7 @@ public class EntityPackets {
                 default -> positionOffset;
             };
 
-            final Entity entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, "minecraft:painting", EntityTypes1_21_11.PAINTING);
+            final Entity entity = entityTracker.addEntity(entityUniqueId, entityRuntimeId, "minecraft:painting", EntityTypes26_3.PAINTING);
             entity.setPosition(position);
 
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
@@ -400,12 +408,12 @@ public class EntityPackets {
             wrapper.send(BedrockProtocol.class);
             wrapper.cancel();
 
-            final PacketWrapper setEntityData = PacketWrapper.create(ClientboundPackets26_1.SET_ENTITY_DATA, wrapper.user());
+            final PacketWrapper setEntityData = PacketWrapper.create(ClientboundPackets26_3.SET_ENTITY_DATA, wrapper.user());
             setEntityData.write(Types.VAR_INT, entity.javaId()); // entity id
-            setEntityData.write(VersionedTypes.V26_1.entityDataList, Lists.newArrayList(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.PAINTING_VARIANT), VersionedTypes.V26_1.entityDataTypes.paintingVariantType, paintingHolder))); // entity data
+            setEntityData.write(VersionedTypes.V26_3.entityDataList, Lists.newArrayList(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.PAINTING_VARIANT), VersionedTypes.V26_3.entityDataTypes.paintingVariantType, paintingHolder))); // entity data
             setEntityData.send(BedrockProtocol.class);
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.ENTITY_EVENT, ClientboundPackets26_1.ENTITY_EVENT, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.ENTITY_EVENT, ClientboundPackets26_3.ENTITY_EVENT, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
             final GameSessionStorage gameSession = wrapper.user().get(GameSessionStorage.class);
 
@@ -431,14 +439,14 @@ public class EntityPackets {
                     final SharedTypes_Legacy_ActorDamageCause damageCause = SharedTypes_Legacy_ActorDamageCause.getByValue(data, SharedTypes_Legacy_ActorDamageCause.Override);
                     final CompoundTag damageTypeEntry = damageTypeRegistry.getCompoundTag(BedrockProtocol.MAPPINGS.getBedrockToJavaDamageCauses().get(damageCause));
 
-                    wrapper.setPacketType(ClientboundPackets26_1.DAMAGE_EVENT);
+                    wrapper.setPacketType(ClientboundPackets26_3.DAMAGE_EVENT);
                     wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
                     wrapper.write(Types.VAR_INT, RegistryUtil.getRegistryIndex(damageTypeRegistry, damageTypeEntry)); // source type
-                    wrapper.write(Types.VAR_INT, 0); // source cause id
-                    wrapper.write(Types.VAR_INT, 0); // source direct id
+                    wrapper.write(Types.OPTIONAL_VAR_INT, null); // source cause id
+                    wrapper.write(Types.OPTIONAL_VAR_INT, null); // source direct id
                     wrapper.write(Types.BOOLEAN, false); // has source position
                     if (entity != entityTracker.getClientPlayer()) {
-                        entity.playSound(SharedTypes_Legacy_LevelSoundEvent.Hurt);
+                        entity.playSound("hurt");
                     }
                 }
                 case DEATH -> {
@@ -448,13 +456,13 @@ public class EntityPackets {
                         livingEntity.sendAttribute("minecraft:health");
                     }
                     if (entity == entityTracker.getClientPlayer() && entityTracker.getClientPlayer().isDead() && gameSession.getDeathMessage() != null) {
-                        final PacketWrapper playerCombatKill = PacketWrapper.create(ClientboundPackets26_1.PLAYER_COMBAT_KILL, wrapper.user());
+                        final PacketWrapper playerCombatKill = PacketWrapper.create(ClientboundPackets26_3.PLAYER_COMBAT_KILL, wrapper.user());
                         playerCombatKill.write(Types.VAR_INT, entityTracker.getClientPlayer().javaId()); // entity id
                         playerCombatKill.write(Types.TAG, TextUtil.textComponentToNbt(gameSession.getDeathMessage())); // message
                         playerCombatKill.send(BedrockProtocol.class);
                     }
                     if (entity != entityTracker.getClientPlayer()) {
-                        entity.playSound(SharedTypes_Legacy_LevelSoundEvent.Death);
+                        entity.playSound("death");
                     }
                 }
                 default -> {
@@ -464,7 +472,7 @@ public class EntityPackets {
                 }
             }
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.UPDATE_ATTRIBUTES, ClientboundPackets26_1.UPDATE_ATTRIBUTES, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.UPDATE_ATTRIBUTES, ClientboundPackets26_3.UPDATE_ATTRIBUTES, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
 
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
@@ -498,7 +506,7 @@ public class EntityPackets {
                 wrapper.cancel();
             }
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.SET_ENTITY_DATA, ClientboundPackets26_1.SET_ENTITY_DATA, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.SET_ENTITY_DATA, ClientboundPackets26_3.SET_ENTITY_DATA, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
 
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
@@ -516,9 +524,9 @@ public class EntityPackets {
             entity.updateEntityData(entityData, javaEntityData);
             entity.translateEntityProperties(entityProperties, javaEntityData);
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
-            wrapper.write(VersionedTypes.V26_1.entityDataList, javaEntityData); // entity data
+            wrapper.write(VersionedTypes.V26_3.entityDataList, javaEntityData); // entity data
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.MOB_EFFECT, ClientboundPackets26_1.UPDATE_MOB_EFFECT, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.MOB_EFFECT, ClientboundPackets26_3.UPDATE_MOB_EFFECT, wrapper -> {
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
             final MobEffectPacketPayload_Event event = MobEffectPacketPayload_Event.getByValue(wrapper.read(Types.BYTE), MobEffectPacketPayload_Event.Invalid); // event id
             final int effectId = wrapper.read(BedrockTypes.VAR_INT); // effect id
@@ -543,13 +551,13 @@ public class EntityPackets {
                 case Invalid -> wrapper.cancel();
                 case Add, Update -> livingEntity.updateEffect(effect, wrapper);
                 case Remove -> {
-                    wrapper.setPacketType(ClientboundPackets26_1.REMOVE_MOB_EFFECT);
+                    wrapper.setPacketType(ClientboundPackets26_3.REMOVE_MOB_EFFECT);
                     livingEntity.removeEffect(bedrockIdentifier, wrapper);
                 }
                 default -> throw new IllegalStateException("Unhandled MobEffectPacketPayload_Event: " + event);
             }
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.ANIMATE, ClientboundPackets26_1.ANIMATE, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.ANIMATE, ClientboundPackets26_3.ANIMATE, wrapper -> {
             final AnimatePacketPayload_Action action = AnimatePacketPayload_Action.getByValue(wrapper.read(Types.UNSIGNED_BYTE), AnimatePacketPayload_Action.NoAction); // action
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
             wrapper.read(BedrockTypes.FLOAT_LE); // data
@@ -562,31 +570,27 @@ public class EntityPackets {
             }
 
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
-            wrapper.write(Types.UNSIGNED_BYTE, (short) (switch (action) {
-                case NoAction -> {
-                    wrapper.cancel();
-                    yield AnimateAction.SWING_MAIN_HAND; // any action
+            switch (action) {
+                case NoAction -> wrapper.cancel();
+                case Swing -> {
+                    wrapper.setPacketType(ClientboundPackets26_3.SWING_ANIMATION);
+                    wrapper.write(Types.VAR_INT, 0); // hand
+                    wrapper.write(SwingAnimation.TYPE, DEFAULT_SWING_ANIMATION);
                 }
-                case Swing -> AnimateAction.SWING_MAIN_HAND;
-                case WakeUp -> {
-                    if (entity instanceof ClientPlayerEntity clientPlayer) {
-                        clientPlayer.sendPlayerActionPacketToServer(PlayerActionType.StopSleeping);
-                    }
-                    yield AnimateAction.WAKE_UP;
-                }
-                case CriticalHit -> AnimateAction.CRITICAL_HIT;
-                case MagicCriticalHit -> AnimateAction.MAGIC_CRITICAL_HIT;
+                case WakeUp -> wrapper.write(Types.UNSIGNED_BYTE, (short) AnimateAction.WAKE_UP.ordinal()); // action
+                case CriticalHit -> wrapper.write(Types.UNSIGNED_BYTE, (short) AnimateAction.CRITICAL_HIT.ordinal()); // action
+                case MagicCriticalHit -> wrapper.write(Types.UNSIGNED_BYTE, (short) AnimateAction.MAGIC_CRITICAL_HIT.ordinal()); // action
                 default -> throw new IllegalStateException("Unhandled AnimatePacket_Action: " + action);
-            }).ordinal()); // action
+            }
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.MOB_ARMOR_EQUIPMENT, ClientboundPackets26_1.SET_EQUIPMENT, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.MOB_ARMOR_EQUIPMENT, ClientboundPackets26_3.SET_EQUIPMENT, wrapper -> {
             final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
-            final BedrockItem head = wrapper.read(itemRewriter.itemType()); // head
-            final BedrockItem chest = wrapper.read(itemRewriter.itemType()); // chest
-            final BedrockItem legs = wrapper.read(itemRewriter.itemType()); // legs
-            final BedrockItem feet = wrapper.read(itemRewriter.itemType()); // feet
-            final BedrockItem body = wrapper.read(itemRewriter.itemType()); // body
+            final BedrockItem head = wrapper.read(itemRewriter.newItemType()); // head
+            final BedrockItem chest = wrapper.read(itemRewriter.newItemType()); // chest
+            final BedrockItem legs = wrapper.read(itemRewriter.newItemType()); // legs
+            final BedrockItem feet = wrapper.read(itemRewriter.newItemType()); // feet
+            final BedrockItem body = wrapper.read(itemRewriter.newItemType()); // body
 
             final Entity entity = wrapper.user().get(EntityTracker.class).getEntityByRid(entityRuntimeId);
             if (entity == null || entity instanceof ClientPlayerEntity) {
@@ -596,17 +600,17 @@ public class EntityPackets {
 
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
             wrapper.write(Types.BYTE, (byte) (EquipmentSlot.FEET.ordinal() | Byte.MIN_VALUE)); // slot
-            wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(feet)); // item
+            wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(feet)); // item
             wrapper.write(Types.BYTE, (byte) (EquipmentSlot.LEGS.ordinal() | Byte.MIN_VALUE)); // slot
-            wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(legs)); // item
+            wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(legs)); // item
             wrapper.write(Types.BYTE, (byte) (EquipmentSlot.CHEST.ordinal() | Byte.MIN_VALUE)); // slot
-            wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(chest)); // item
+            wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(chest)); // item
             wrapper.write(Types.BYTE, (byte) (EquipmentSlot.HEAD.ordinal() | Byte.MIN_VALUE)); // slot
-            wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(head)); // item
+            wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(head)); // item
             wrapper.write(Types.BYTE, (byte) EquipmentSlot.BODY.ordinal()); // slot
-            wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(body)); // item
+            wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(body)); // item
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.MOB_EQUIPMENT, ClientboundPackets26_1.SET_EQUIPMENT, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.MOB_EQUIPMENT, ClientboundPackets26_3.SET_EQUIPMENT, wrapper -> {
             final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
             final long entityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // entity runtime id
             final BedrockItem item = wrapper.read(itemRewriter.newItemType()); // item
@@ -623,22 +627,22 @@ public class EntityPackets {
             wrapper.write(Types.VAR_INT, entity.javaId()); // entity id
             if (containerId == ContainerID.CONTAINER_ID_INVENTORY.getValue() && slot >= 0 && slot < 9 && (slot == selectedSlot || selectedSlot < 0)) {
                 wrapper.write(Types.BYTE, (byte) EquipmentSlot.MAINHAND.ordinal()); // slot
-                wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(item)); // item
+                wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(item)); // item
             } else if (containerId == ContainerID.CONTAINER_ID_OFFHAND.getValue()) {
                 wrapper.write(Types.BYTE, (byte) EquipmentSlot.OFFHAND.ordinal()); // slot
-                wrapper.write(VersionedTypes.V26_1.item, itemRewriter.javaItem(item)); // item
+                wrapper.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(item)); // item
             } else {
                 wrapper.cancel();
             }
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.TAKE_ITEM_ENTITY, ClientboundPackets26_1.TAKE_ITEM_ENTITY, wrapper -> {
+        protocol.registerClientbound(ClientboundBedrockPackets.TAKE_ITEM_ENTITY, ClientboundPackets26_3.TAKE_ITEM_ENTITY, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
             final long itemEntityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // item entity runtime id
             final long collectorEntityRuntimeId = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // collector entity runtime id
 
             final Entity itemEntity = entityTracker.getEntityByRid(itemEntityRuntimeId);
             final Entity collectorEntity = entityTracker.getEntityByRid(collectorEntityRuntimeId);
-            if (itemEntity == null || collectorEntity == null || itemEntity.javaType() != EntityTypes1_21_11.ITEM) {
+            if (itemEntity == null || collectorEntity == null || itemEntity.javaType() != EntityTypes26_3.ITEM) {
                 wrapper.cancel();
                 return;
             }
@@ -646,6 +650,56 @@ public class EntityPackets {
             wrapper.write(Types.VAR_INT, collectorEntity.javaId()); // collector entity id
             wrapper.write(Types.VAR_INT, 0); // amount
         });
+        protocol.registerClientbound(ClientboundBedrockPackets.SYNC_ENTITY_PROPERTY, null, wrapper -> {
+            wrapper.cancel();
+            final Tag tag = wrapper.read(BedrockTypes.NETWORK_TAG);
+
+            final EntityPropertyTracker epTracker = wrapper.user().get(EntityPropertyTracker.class);
+
+            final String entityType = ((CompoundTag) tag).getString("type");
+            final List<EntityProperty> intEntityProperties = new ArrayList<>();
+            final List<EntityProperty.FloatProperty> floatEntityProperties = new ArrayList<>();
+
+            final ListTag<CompoundTag> properties = ((CompoundTag) tag).getListTag("properties", CompoundTag.class);
+            for (CompoundTag property : properties) {
+                final EntityProperty newProperty = switch (property.getInt("type")) {
+                    case 0 -> new EntityProperty.IntProperty(
+                            property.getString("name"),
+                            property.getInt("min"),
+                            property.getInt("max")
+                    );
+                    case 1 -> new EntityProperty.FloatProperty(
+                            property.getString("name"),
+                            property.getFloat("min"),
+                            property.getFloat("max")
+                    );
+                    case 2 -> new EntityProperty.BooleanProperty(
+                            property.getString("name")
+                    );
+                    case 3 -> new EntityProperty.EnumProperty(
+                            property.getString("name"),
+                            property.getListTag("enum", StringTag.class).stream().map(StringTag::getValue).toArray(String[]::new)
+                    );
+                    default -> {
+                        ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received entity property with unknown type: " + property.getInt("type"));
+                        yield null;
+                    }
+                };
+
+                if (newProperty != null) {
+                    if (newProperty instanceof EntityProperty.FloatProperty floatProperty) {
+                        floatEntityProperties.add(floatProperty);
+                    } else {
+                        intEntityProperties.add(newProperty);
+                    }
+                }
+            }
+
+            epTracker.addEntity(entityType, new EntityPropertyList(intEntityProperties, floatEntityProperties));
+        });
+    }
+
+    private EntityPackets() {
     }
 
 }

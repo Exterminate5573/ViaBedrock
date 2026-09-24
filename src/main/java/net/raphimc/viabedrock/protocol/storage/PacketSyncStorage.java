@@ -24,8 +24,8 @@ import com.viaversion.viaversion.api.protocol.packet.State;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectMap;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
-import com.viaversion.viaversion.protocols.v1_21_7to1_21_9.packet.ClientboundConfigurationPackets1_21_9;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundConfigurationPackets26_3;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 
@@ -34,7 +34,7 @@ import java.util.logging.Level;
 
 public class PacketSyncStorage extends StoredObject {
 
-    private final AtomicInteger ID_COUNTER = new AtomicInteger(0);
+    private final AtomicInteger idCounter = new AtomicInteger(0);
     private final Int2ObjectMap<Long> pendingNetworkStackLatencyResponses = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<Runnable> pendingActions = new Int2ObjectOpenHashMap<>();
 
@@ -43,10 +43,10 @@ public class PacketSyncStorage extends StoredObject {
     }
 
     public int addNetworkStackLatencyResponse(final long timestamp) {
-        if (ID_COUNTER.get() >= Short.MAX_VALUE) { // VB compatibility
-            ID_COUNTER.set(0);
+        if (this.idCounter.get() >= Short.MAX_VALUE) { // VB compatibility
+            this.idCounter.set(0);
         }
-        final int id = this.ID_COUNTER.getAndIncrement();
+        final int id = this.idCounter.getAndIncrement();
         if (this.pendingNetworkStackLatencyResponses.put(id, Long.valueOf(timestamp)) != null) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Overwrote pending network stack latency response with id " + id);
         }
@@ -58,16 +58,16 @@ public class PacketSyncStorage extends StoredObject {
     }
 
     public void syncWithClient(final Runnable runnable) {
-        if (ID_COUNTER.get() >= Short.MAX_VALUE) { // VB compatibility
-            ID_COUNTER.set(0);
+        if (this.idCounter.get() >= Short.MAX_VALUE) { // VB compatibility
+            this.idCounter.set(0);
         }
-        final int id = ID_COUNTER.getAndIncrement();
+        final int id = this.idCounter.getAndIncrement();
         if (this.pendingActions.put(id, runnable) != null) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Overwrote pending action with id " + id);
         }
 
         final State state = this.user().getProtocolInfo().getServerState();
-        final PacketWrapper pingPacket = PacketWrapper.create(state == State.PLAY ? ClientboundPackets26_1.PING : ClientboundConfigurationPackets1_21_9.PING, this.user());
+        final PacketWrapper pingPacket = PacketWrapper.create(state == State.PLAY ? ClientboundPackets26_3.PING : ClientboundConfigurationPackets26_3.PING, this.user());
         pingPacket.write(Types.INT, id); // parameter
         pingPacket.send(BedrockProtocol.class);
     }

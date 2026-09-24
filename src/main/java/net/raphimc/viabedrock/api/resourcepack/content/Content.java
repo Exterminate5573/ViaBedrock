@@ -30,6 +30,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -90,12 +91,12 @@ public abstract class Content {
         return this.langCache.computeIfAbsent(path, k -> {
             final List<String> lines = this.getLines(k);
             return Collections.unmodifiableMap(lines.stream()
-                    .filter(line -> !line.startsWith("##"))
-                    .filter(line -> line.contains("="))
-                    .map(line -> line.contains("##") ? line.substring(0, line.indexOf("##")) : line)
-                    .map(String::trim)
-                    .map(line -> line.split("=", 2))
-                    .collect(Collectors.toMap(parts -> parts[0], parts -> parts[1], (o, n) -> n)));
+                .filter(line -> !line.startsWith("##"))
+                .filter(line -> line.contains("="))
+                .map(line -> line.contains("##") ? line.substring(0, line.indexOf("##")) : line)
+                .map(String::trim)
+                .map(line -> line.split("=", 2))
+                .collect(Collectors.toMap(parts -> parts[0], parts -> parts[1], (o, n) -> n)));
         });
     }
 
@@ -143,10 +144,16 @@ public abstract class Content {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             ImageIO.write(image, "png", baos);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new UncheckedIOException(e);
         }
         return this.put(path, baos.toByteArray());
+    }
+
+    public void putAll(final Content content) {
+        for (String path : content.getFilesDeep("", "")) {
+            this.copyFrom(content, path, path);
+        }
     }
 
     public void copyFrom(final Content content, final String sourcePath, final String targetPath) {
@@ -156,6 +163,7 @@ public abstract class Content {
     public byte[] toZip() throws IOException {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(4 * 1024 * 1024);
         final ZipOutputStream zipOutputStream = new ZipOutputStream(baos);
+        zipOutputStream.setLevel(Deflater.BEST_SPEED);
         for (String path : this.getFilesDeep("", "")) {
             final ZipEntry entry = new ZipEntry(path);
             entry.setTime(0L);
@@ -182,7 +190,7 @@ public abstract class Content {
             if (this.image == null) {
                 try {
                     this.image = ImageIO.read(new ByteArrayInputStream(this.bytes));
-                } catch (IOException e) {
+                } catch (final IOException e) {
                     throw new RuntimeException(e);
                 }
             }
@@ -201,7 +209,7 @@ public abstract class Content {
                 final ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 try {
                     ImageIO.write(image, "png", baos);
-                } catch (IOException e) {
+                } catch (final IOException e) {
                     throw new RuntimeException(e);
                 }
                 return baos.toByteArray();

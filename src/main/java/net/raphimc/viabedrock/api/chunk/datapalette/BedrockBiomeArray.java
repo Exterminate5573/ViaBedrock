@@ -17,9 +17,7 @@
  */
 package net.raphimc.viabedrock.api.chunk.datapalette;
 
-import com.viaversion.viaversion.api.minecraft.chunks.DataPalette;
-
-public class BedrockBiomeArray implements DataPalette, Cloneable {
+public class BedrockBiomeArray implements DefaultedDataPalette {
 
     private final byte[] biomes;
 
@@ -84,8 +82,7 @@ public class BedrockBiomeArray implements DataPalette, Cloneable {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public BedrockBiomeArray clone() {
+    public BedrockBiomeArray copy() {
         return new BedrockBiomeArray(this.biomes.clone());
     }
 

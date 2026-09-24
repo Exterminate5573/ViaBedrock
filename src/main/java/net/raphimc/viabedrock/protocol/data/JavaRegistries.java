@@ -21,6 +21,7 @@ import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.ListTag;
 import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.libs.fastutil.ints.IntIntPair;
+import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.resourcepack.definition.BiomeDefinitions;
 import net.raphimc.viabedrock.api.resourcepack.definition.FogDefinitions;
@@ -36,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
-public class JavaRegistries {
+public final class JavaRegistries {
 
     private static final int BEDROCK_DEFAULT_WATER_COLOR = 4501493;
     private static final int JAVA_DEFAULT_FOG_COLOR = 12638463;
@@ -78,10 +79,9 @@ public class JavaRegistries {
         final Map<String, Object> foliageColor = BedrockProtocol.MAPPINGS.getBedrockToJavaBiomeExtraData().get("foliage_color");
         final Map<String, Object> grassColor = BedrockProtocol.MAPPINGS.getBedrockToJavaBiomeExtraData().get("grass_color");
         final Map<String, Object> grassColorModifier = BedrockProtocol.MAPPINGS.getBedrockToJavaBiomeExtraData().get("grass_color_modifier");
-        final Map<String, Object> moodSound = BedrockProtocol.MAPPINGS.getBedrockToJavaBiomeExtraData().get("mood_sound");
 
         for (String bedrockBiomeName : BedrockProtocol.MAPPINGS.getBedrockBiomes().keySet()) {
-            final CompoundTag bedrockBiome = biomeDefinitions.getCompoundTag(bedrockBiomeName);
+            final CompoundTag bedrockBiome = biomeDefinitions.getCompoundTag(Key.namespaced(bedrockBiomeName));
             final BiomeDefinitions.BiomeDefinition bedrockBiomeDefinition = resourcePackStorage.getBiomes().get(bedrockBiomeName);
             final FogDefinitions.FogDefinition bedrockFogDefinition = bedrockBiomeDefinition != null ? resourcePackStorage.getFogs().get(bedrockBiomeDefinition.fog()) : null;
             if (bedrockBiome == null) {
@@ -89,7 +89,7 @@ public class JavaRegistries {
                 continue;
             }
 
-            final String javaIdentifier = "minecraft:" + bedrockBiomeName;
+            final String javaIdentifier = Key.namespaced(bedrockBiomeName);
             final CompoundTag javaBiome = new CompoundTag();
             javaBiome.put("temperature", bedrockBiome.get("temperature"));
             javaBiome.put("downfall", bedrockBiome.get("downfall"));
@@ -102,16 +102,16 @@ public class JavaRegistries {
             javaBiome.put("attributes", attributes);
 
             final ListTag<CompoundTag> ambientParticles = new ListTag<>(CompoundTag.class);
-            final float blue_spores = bedrockBiome.getFloat("blue_spores");
-            final float white_ash = bedrockBiome.getFloat("white_ash");
-            final float red_spores = bedrockBiome.getFloat("red_spores");
-            final float ash = bedrockBiome.getFloat("ash");
-            if (blue_spores > 0) {
-                ambientParticles.add(createBiomeParticle("minecraft:warped_spore", blue_spores / 10F));
-            } else if (white_ash > 0) {
-                ambientParticles.add(createBiomeParticle("minecraft:white_ash", white_ash / 10F));
-            } else if (red_spores > 0) {
-                ambientParticles.add(createBiomeParticle("minecraft:crimson_spore", red_spores / 10F));
+            final float blueSpores = bedrockBiome.getDoubleTag("blueSporeDensity").asFloat();
+            final float whiteAsh = bedrockBiome.getDoubleTag("whiteAshDensity").asFloat();
+            final float redSpores = bedrockBiome.getDoubleTag("redSporeDensity").asFloat();
+            final float ash = bedrockBiome.getDoubleTag("ashDensity").asFloat();
+            if (blueSpores > 0) {
+                ambientParticles.add(createBiomeParticle("minecraft:warped_spore", blueSpores / 10F));
+            } else if (whiteAsh > 0) {
+                ambientParticles.add(createBiomeParticle("minecraft:white_ash", whiteAsh / 10F));
+            } else if (redSpores > 0) {
+                ambientParticles.add(createBiomeParticle("minecraft:crimson_spore", redSpores / 10F));
             } else if (ash > 0) {
                 ambientParticles.add(createBiomeParticle("minecraft:ash", ash / 10F));
             }
@@ -127,7 +127,7 @@ public class JavaRegistries {
             if (bedrockBiomeDefinition != null && bedrockBiomeDefinition.skyColor() != null) {
                 attributes.putInt("minecraft:visual/sky_color", bedrockBiomeDefinition.skyColor());
             } else {
-                attributes.putInt("minecraft:visual/sky_color", getSkyColor(bedrockBiome.getFloatTag("temperature").asFloat()));
+                attributes.putInt("minecraft:visual/sky_color", getSkyColor(bedrockBiome.getDoubleTag("temperature").asFloat()));
             }
             if (bedrockFogDefinition != null && bedrockFogDefinition.colors().containsKey("air")) {
                 attributes.putInt("minecraft:visual/fog_color", bedrockFogDefinition.colors().get("air"));
@@ -152,14 +152,14 @@ public class JavaRegistries {
                     effects.putString("grass_color_modifier", (String) grassColorModifier.get(tag));
                 }
                 /*if (moodSound.containsKey(tag)) {
-                    effects.put("mood_sound", createMoodSound((String) moodSound.get(tag)));
-                }*/
+                 *     effects.put("mood_sound", createMoodSound((String) moodSound.get(tag)));
+                 * }*/
             }
 
             // One warning is enough
             /*if (!effects.contains("mood_sound")) {
-                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Missing mood sound for " + bedrockBiomeName + ": " + bedrockBiome);
-            }*/
+             *     ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Missing mood sound for " + bedrockBiomeName + ": " + bedrockBiome);
+             * }*/
 
             // TODO: Enhancement: Biome sounds
 
@@ -196,18 +196,21 @@ public class JavaRegistries {
     }
 
     /*private static CompoundTag createMoodSound(final String soundId) {
-        final CompoundTag moodSound = new CompoundTag();
-        moodSound.putInt("tick_delay", 6000);
-        moodSound.putFloat("offset", 2F);
-        moodSound.putString("sound", soundId);
-        moodSound.putInt("block_search_extent", 8);
-        return moodSound;
-    }*/
+     *     final CompoundTag moodSound = new CompoundTag();
+     *     moodSound.putInt("tick_delay", 6000);
+     *     moodSound.putFloat("offset", 2F);
+     *     moodSound.putString("sound", soundId);
+     *     moodSound.putInt("block_search_extent", 8);
+     *     return moodSound;
+     * }*/
 
     private static int getSkyColor(final float temperature) {
         float f = temperature / 3F;
         f = MathUtil.clamp(f, -1F, 1F);
         return Color.HSBtoRGB(0.62222224F - f * 0.05F, 0.5F + f * 0.1F, 1F) & 0xFFFFFF;
+    }
+
+    private JavaRegistries() {
     }
 
 }
