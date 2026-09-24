@@ -18,21 +18,20 @@
 package net.raphimc.viabedrock.api.model.entity;
 
 import com.viaversion.viaversion.api.connection.UserConnection;
-import com.viaversion.viaversion.api.minecraft.entities.EntityTypes1_21_11;
+import com.viaversion.viaversion.api.minecraft.entities.EntityTypes26_3;
 import com.viaversion.viaversion.api.minecraft.entitydata.EntityData;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.util.EnumUtil;
-import net.raphimc.viabedrock.experimental.rewriter.EntityMetadataRewriter;
+import net.raphimc.viabedrock.protocol.rewriter.EntityMetadataRewriter;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ActorDataIDs;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ActorFlags;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.ActorDataIDs;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.ActorFlags;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.DataItemType;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.SharedTypes_Legacy_LevelSoundEvent;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.BossEventOperationType;
 import net.raphimc.viabedrock.protocol.model.EntityProperties;
 import net.raphimc.viabedrock.protocol.model.Position3f;
@@ -51,7 +50,7 @@ public class Entity {
     protected final String type;
     protected final int javaId;
     protected final UUID javaUuid;
-    protected final EntityTypes1_21_11 javaType;
+    protected final EntityTypes26_3 javaType;
 
     /**
      * x, y, z
@@ -67,7 +66,11 @@ public class Entity {
     protected int age;
     protected boolean hasBossBar;
 
-    public Entity(final UserConnection user, final long uniqueId, final long runtimeId, final String type, final int javaId, final UUID javaUuid, final EntityTypes1_21_11 javaType) {
+    // Mounting
+    protected List<Long> passengers = new ArrayList<>();
+    protected long mountRuntimeId = -1;
+
+    public Entity(final UserConnection user, final long uniqueId, final long runtimeId, final String type, final int javaId, final UUID javaUuid, final EntityTypes26_3 javaType) {
         this.user = user;
         this.uniqueId = uniqueId;
         this.runtimeId = runtimeId;
@@ -84,7 +87,7 @@ public class Entity {
     public void remove() {
         if (this.hasBossBar) {
             this.hasBossBar = false;
-            final PacketWrapper bossEvent = PacketWrapper.create(ClientboundPackets26_1.BOSS_EVENT, this.user);
+            final PacketWrapper bossEvent = PacketWrapper.create(ClientboundPackets26_3.BOSS_EVENT, this.user);
             bossEvent.write(Types.UUID, this.javaUuid()); // uuid
             bossEvent.write(Types.VAR_INT, BossEventOperationType.REMOVE.ordinal()); // operation
             bossEvent.send(BedrockProtocol.class);
@@ -94,9 +97,9 @@ public class Entity {
     public final void updateEntityData(final EntityData[] entityData) {
         final List<EntityData> javaEntityData = new ArrayList<>();
         this.updateEntityData(entityData, javaEntityData);
-        final PacketWrapper setEntityData = PacketWrapper.create(ClientboundPackets26_1.SET_ENTITY_DATA, this.user);
+        final PacketWrapper setEntityData = PacketWrapper.create(ClientboundPackets26_3.SET_ENTITY_DATA, this.user);
         setEntityData.write(Types.VAR_INT, this.javaId); // entity id
-        setEntityData.write(VersionedTypes.V26_1.entityDataList, javaEntityData); // entity data
+        setEntityData.write(VersionedTypes.V26_3.entityDataList, javaEntityData); // entity data
         setEntityData.send(BedrockProtocol.class);
     }
 
@@ -122,14 +125,12 @@ public class Entity {
     }
 
     public final void translateEntityProperties(final EntityProperties properties, final List<EntityData> javaEntityData) {
-        if (ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
-            EntityMetadataRewriter.rewriteProperties(user, this, properties, javaEntityData);
-        }
+        EntityMetadataRewriter.rewriteProperties(this.user, this, properties, javaEntityData);
     }
 
-    public void playSound(final SharedTypes_Legacy_LevelSoundEvent soundEvent) {
+    public void playSound(final String soundEvent) {
         final PacketWrapper levelSoundEvent = PacketWrapper.create(ClientboundBedrockPackets.LEVEL_SOUND_EVENT, this.user);
-        levelSoundEvent.write(BedrockTypes.UNSIGNED_VAR_INT, soundEvent.getValue()); // event
+        levelSoundEvent.write(BedrockTypes.STRING, soundEvent); // event
         levelSoundEvent.write(BedrockTypes.POSITION_3F, this.position); // position
         levelSoundEvent.write(BedrockTypes.VAR_INT, 0); // data
         levelSoundEvent.write(BedrockTypes.STRING, this.type); // entity identifier
@@ -164,7 +165,7 @@ public class Entity {
         return this.javaUuid;
     }
 
-    public EntityTypes1_21_11 javaType() {
+    public EntityTypes26_3 javaType() {
         return this.javaType;
     }
 
@@ -227,6 +228,28 @@ public class Entity {
         this.hasBossBar = hasBossBar;
     }
 
+    public void addPassenger(final long passengerRuntimeId) {
+        if (!this.passengers.contains(passengerRuntimeId)) {
+            this.passengers.add(passengerRuntimeId);
+        }
+    }
+
+    public void removePassenger(final long passengerRuntimeId) {
+        this.passengers.remove(passengerRuntimeId);
+    }
+
+    public List<Long> passengers() {
+        return Collections.unmodifiableList(this.passengers);
+    }
+
+    public void setMountEntityRId(final long runtimeId) {
+        this.mountRuntimeId = runtimeId;
+    }
+
+    public long mountEntityRId() {
+        return this.mountRuntimeId;
+    }
+
     public final int getJavaEntityDataIndex(final String fieldName) {
         final int index = BedrockProtocol.MAPPINGS.getJavaEntityDataFields().get(this.javaType).indexOf(fieldName);
         if (index == -1) {
@@ -236,11 +259,7 @@ public class Entity {
     }
 
     protected boolean translateEntityData(final ActorDataIDs id, final EntityData entityData, final List<EntityData> javaEntityData) {
-        if (ViaBedrock.getConfig().shouldEnableExperimentalFeatures()) {
-            return EntityMetadataRewriter.rewrite(user, this, id, entityData, javaEntityData);
-        }
-
-        return false;
+        return EntityMetadataRewriter.rewrite(user, this, id, entityData, javaEntityData);
     }
 
     protected void onEntityDataChanged() {

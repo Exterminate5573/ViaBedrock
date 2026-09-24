@@ -30,7 +30,7 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.MemoryTier;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.BuildPlatform;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.GraphicsMode;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InputMode;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.UIProfile;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.UIProfile;
 import net.raphimc.viabedrock.protocol.model.SkinData;
 import net.raphimc.viabedrock.protocol.storage.AuthData;
 import net.raphimc.viabedrock.protocol.storage.ChannelStorage;
@@ -109,6 +109,11 @@ public class SkinProvider implements Provider {
             claims.put("PlatformType", 0);
             claims.put("PlatformOfflineId", "");
             claims.put("PlatformOnlineId", "");
+        }
+        { // @since 26.40
+            claims.put("ClientEditorConnectionIntent", 0);
+            claims.put("ClientIsEditorCapable", false);
+            claims.put("ProfileHash", "");
         }
 
         return claims;
