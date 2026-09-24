@@ -23,15 +23,16 @@ import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+
 import net.raphimc.viabedrock.ViaBedrock;
-import net.raphimc.viabedrock.experimental.model.container.ExperimentalContainer;
-import net.raphimc.viabedrock.experimental.model.recipe.ItemDescriptor;
-import net.raphimc.viabedrock.experimental.model.recipe.ShapedRecipe;
-import net.raphimc.viabedrock.experimental.model.recipe.ShapelessRecipe;
-import net.raphimc.viabedrock.experimental.model.recipe.SmithingRecipe;
+import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.model.recipe.ItemDescriptor;
+import net.raphimc.viabedrock.protocol.model.recipe.ShapedRecipe;
+import net.raphimc.viabedrock.protocol.model.recipe.ShapelessRecipe;
+import net.raphimc.viabedrock.protocol.model.recipe.SmithingRecipe;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.ArrayList;
@@ -54,7 +55,7 @@ public class CraftingDataTracker extends StoredObject {
     }
 
     // TODO: Allow matching in 2x2 grid
-    public CraftingDataStorage getRecipeData(ExperimentalContainer container, String tag) {
+    public CraftingDataStorage getRecipeData(Container container, String tag) {
         for (CraftingDataStorage craftingData : this.getCraftingDataList()) {
             if (craftingData.recipe() == null || !craftingData.recipe().getRecipeTag().equals(tag)) {
                 continue;
@@ -91,7 +92,7 @@ public class CraftingDataTracker extends StoredObject {
         return null;
     }
 
-    private boolean matchShapelessRecipe(ExperimentalContainer container, ShapelessRecipe recipe) {
+    private boolean matchShapelessRecipe(Container container, ShapelessRecipe recipe) {
         boolean[] used = new boolean[9];
         for (ItemDescriptor descriptor : recipe.getIngredients()) {
             if (!findMatchingSlot(container, descriptor, used)) {
@@ -101,7 +102,7 @@ public class CraftingDataTracker extends StoredObject {
         return noExtraItems(container, used);
     }
 
-    private boolean matchShapedRecipe(ExperimentalContainer container, ShapedRecipe recipe) {
+    private boolean matchShapedRecipe(Container container, ShapedRecipe recipe) {
         int height = recipe.getPattern().length;
         int width = recipe.getPattern()[0].length;
 
@@ -115,7 +116,7 @@ public class CraftingDataTracker extends StoredObject {
         return false;
     }
 
-    private boolean findMatchingSlot(ExperimentalContainer container, ItemDescriptor descriptor, boolean[] used) {
+    private boolean findMatchingSlot(Container container, ItemDescriptor descriptor, boolean[] used) {
         for (int slot = 0; slot < 9; slot++) {
             if (used[slot]) continue;
             int inputSlot = container.bedrockSlot(slot + 1);
@@ -128,7 +129,7 @@ public class CraftingDataTracker extends StoredObject {
         return false;
     }
 
-    private boolean noExtraItems(ExperimentalContainer container, boolean[] used) {
+    private boolean noExtraItems(Container container, boolean[] used) {
         for (int slot = 0; slot < 9; slot++) {
             int inputSlot = container.bedrockSlot(slot + 1);
             if (!used[slot] && !container.getItem(inputSlot).isEmpty()) {
@@ -138,7 +139,7 @@ public class CraftingDataTracker extends StoredObject {
         return true;
     }
 
-    private boolean checkPattern(ExperimentalContainer container, ShapedRecipe recipe, int startX, int startY) {
+    private boolean checkPattern(Container container, ShapedRecipe recipe, int startX, int startY) {
         int height = recipe.getPattern().length;
         int width = recipe.getPattern()[0].length;
 
@@ -154,7 +155,7 @@ public class CraftingDataTracker extends StoredObject {
         return true;
     }
 
-    private boolean noExtraItemsOutsidePattern(ExperimentalContainer container, int startX, int startY, int width, int height) {
+    private boolean noExtraItemsOutsidePattern(Container container, int startX, int startY, int width, int height) {
         for (int gx = 0; gx < 3; gx++) {
             for (int gy = 0; gy < 3; gy++) {
                 if (gx >= startX && gx < startX + width && gy >= startY && gy < startY + height) {
@@ -177,7 +178,7 @@ public class CraftingDataTracker extends StoredObject {
         }
         ItemRewriter itemRewriter = user.get(ItemRewriter.class);
 
-        PacketWrapper packet = PacketWrapper.create(ClientboundPackets26_1.UPDATE_RECIPES, user);
+        PacketWrapper packet = PacketWrapper.create(ClientboundPackets26_3.UPDATE_RECIPES, user);
         packet.write(Types.VAR_INT, 0); // Property Sets (Prefixed array) TODO: Sends registries e.g. furnace fuel, smithing template
         List<CraftingDataStorage> stonecutterList = craftingDataList.stream()
                 .filter(c -> c.recipe().getRecipeTag().equals("stonecutter"))
@@ -194,7 +195,7 @@ public class CraftingDataTracker extends StoredObject {
             //Slot Display
             Item javaOutput = itemRewriter.javaItem(((ShapelessRecipe)craftingData.recipe()).getResults().get(0));
             packet.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaSlotDisplayId("minecraft:item_stack")); // Type
-            packet.write(VersionedTypes.V26_1.itemTemplate, javaOutput);
+            packet.write(VersionedTypes.V26_3.itemTemplate, javaOutput);
         }
 
         packet.send(BedrockProtocol.class);
@@ -206,7 +207,7 @@ public class CraftingDataTracker extends StoredObject {
             return;
         }
 
-        PacketWrapper packet = PacketWrapper.create(ClientboundPackets26_1.RECIPE_BOOK_ADD, user);
+        PacketWrapper packet = PacketWrapper.create(ClientboundPackets26_3.RECIPE_BOOK_ADD, user);
         packet.write(Types.VAR_INT, craftingDataList.size()); // Number of recipes
         for (CraftingDataStorage craftingData : craftingDataList) {
             packet.write(Types.VAR_INT, craftingData.networkId()); // Recipe ID

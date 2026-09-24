@@ -19,10 +19,11 @@ package net.raphimc.viabedrock.protocol.types.inventory;
 
 import com.viaversion.viaversion.api.type.Type;
 import io.netty.buffer.ByteBuf;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
-import net.raphimc.viabedrock.protocol.types.InventoryTypes;
+
 import net.raphimc.viabedrock.protocol.model.ItemEntry;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
+import net.raphimc.viabedrock.protocol.types.InventoryTypes;
 
 public class ItemStackActionType extends Type<ItemStackRequestAction> {
 
@@ -135,8 +136,8 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
                 BedrockTypes.STRING.write(buffer, craftLoomAction.patternId());
                 buffer.writeByte(craftLoomAction.timesCrafted());
             }
-            case CraftNonImplemented_DEPRECATEDASKTYLAING -> {}
-            case CraftResults_DEPRECATEDASKTYLAING -> {
+            case CraftNonImplemented -> {}
+            case CraftResults -> {
                 ItemStackRequestAction.CraftResultsDeprecatedAction craftResultsAction = (ItemStackRequestAction.CraftResultsDeprecatedAction) value;
 
                 BedrockTypes.ITEM_ENTRY_ARRAY.write(buffer, craftResultsAction.resultItems().toArray(new ItemEntry[0]));

@@ -92,7 +92,7 @@ public interface ItemStackRequestAction {
     record CraftNonImplementedAction() implements ItemStackRequestAction {
         @Override
         public ItemStackRequestActionType getType() {
-            return ItemStackRequestActionType.CraftNonImplemented_DEPRECATEDASKTYLAING;
+            return ItemStackRequestActionType.CraftNonImplemented;
         }
     }
 
@@ -128,7 +128,7 @@ public interface ItemStackRequestAction {
     record CraftResultsDeprecatedAction(List<ItemEntry> resultItems, int timesCrafted) implements ItemStackRequestAction {
         @Override
         public ItemStackRequestActionType getType() {
-            return ItemStackRequestActionType.CraftResults_DEPRECATEDASKTYLAING;
+            return ItemStackRequestActionType.CraftResults;
         }
     }
 

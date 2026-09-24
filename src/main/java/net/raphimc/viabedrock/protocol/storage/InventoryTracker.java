@@ -23,6 +23,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.fastutil.ints.IntObjectPair;
 import net.lenni0451.mcstructs_bedrock.forms.Form;
+
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.model.container.dynamic.BundleContainer;
@@ -91,6 +92,16 @@ public class InventoryTracker extends StoredObject {
         return null;
     }
 
+    public Container getContainerFromName(final FullContainerName containerName, final int slot) {
+        if (containerName.name() == ContainerEnumName.InventoryContainer || containerName.name() == ContainerEnumName.HotbarContainer) return this.inventoryContainer;
+        if (containerName.name() == ContainerEnumName.OffhandContainer) return this.offhandContainer;
+        if (containerName.name() == ContainerEnumName.ArmorContainer) return this.armorContainer;
+        if (containerName.name() == ContainerEnumName.CursorContainer || containerName.name() == ContainerEnumName.CraftingInputContainer) return this.hudContainer;
+        if (containerName.name() == ContainerEnumName.DynamicContainer) return this.dynamicContainerRegistry.get(containerName);
+        if (this.currentContainer != null && containerName.equals(this.currentContainer.getFullContainerName(slot))) return this.currentContainer;
+        return null;
+    }
+
     public BundleContainer getDynamicContainer(final FullContainerName containerName) {
         return this.dynamicContainerRegistry.get(containerName);
     }
@@ -113,6 +124,7 @@ public class InventoryTracker extends StoredObject {
         if (serverInitiated) {
             PacketFactory.sendBedrockContainerClose(this.user(), this.currentContainer.containerId(), ContainerType.NONE);
         }
+        this.hudContainer.setItem(0, BedrockItem.empty());
         this.currentContainer = null;
         this.pendingCloseContainer = null;
     }

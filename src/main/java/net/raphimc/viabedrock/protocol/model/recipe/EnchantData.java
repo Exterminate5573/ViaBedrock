@@ -1,6 +1,6 @@
 /*
  * This file is part of ViaBedrock - https://github.com/RaphiMC/ViaBedrock
- * Copyright (C) 2023-2025 RK_01/RaphiMC and contributors
+ * Copyright (C) 2023-2026 RK_01/RaphiMC and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,20 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package net.raphimc.viabedrock.protocol.storage;
+package net.raphimc.viabedrock.protocol.model.recipe;
 
-import org.jspecify.annotations.NonNull;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.Enchant_Type;
 
-import net.raphimc.viabedrock.protocol.model.recipe.Recipe;
-import net.raphimc.viabedrock.protocol.model.recipe.RecipeType;
-
-public record CraftingDataStorage(RecipeType type, int networkId, Recipe recipe) {
-    @Override
-    public @NonNull String toString() {
-        return "CraftingDataStorage{" +
-                "type=" + type +
-                ", networkId=" + networkId +
-                ", recipe=" + recipe.toString() +
-                '}';
-    }
-}
+public record EnchantData(int cost, Enchant_Type type, int level, int netId) {}

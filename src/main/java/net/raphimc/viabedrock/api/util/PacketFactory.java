@@ -26,6 +26,7 @@ import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.libs.gson.JsonNull;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
@@ -75,6 +76,14 @@ public class PacketFactory {
         final PacketWrapper containerSetContent = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_CONTENT, user);
         writeJavaContainerSetContent(containerSetContent, container);
         containerSetContent.send(BedrockProtocol.class);
+    }
+
+    public static void sendJavaContainerProperties(final UserConnection user, final Container container, final short property, final short value) {
+        final PacketWrapper containerSetProperty = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
+        containerSetProperty.write(Types.VAR_INT, (int) container.javaContainerId()); // container id
+        containerSetProperty.write(Types.SHORT, property); // property id
+        containerSetProperty.write(Types.SHORT, value); // property value
+        containerSetProperty.send(BedrockProtocol.class);
     }
 
     public static void sendJavaGameEvent(final UserConnection user, final GameEventType event, final float value) {

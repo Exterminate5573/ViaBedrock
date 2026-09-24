@@ -21,6 +21,7 @@ import com.viaversion.nbt.tag.IntTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.item.Item;
 import com.viaversion.viaversion.util.Pair;
+
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
@@ -41,10 +42,15 @@ public class BundleContainer extends Container {
     }
 
     @Override
+    public FullContainerName getFullContainerName(int slot) {
+        return this.containerName;
+    }
+
+    @Override
     public Item getJavaItem(final int slot) {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().getJavaItem(holdingContainer.value());
@@ -54,7 +60,7 @@ public class BundleContainer extends Container {
     public Item[] getJavaItems() {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().getJavaItems();
@@ -79,17 +85,27 @@ public class BundleContainer extends Container {
     public int javaSlot(final int slot) {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().javaSlot(holdingContainer.value());
     }
 
     @Override
+    public int bedrockSlot(final int slot) {
+        final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
+        if (holdingContainer == null) {
+            throw new IllegalStateException("Could not find bundle in any container");
+        }
+
+        return holdingContainer.key().bedrockSlot(holdingContainer.value());
+    }
+
+    @Override
     public byte javaContainerId() {
         final Pair<Container, Integer> holdingContainer = this.findHoldingContainer();
         if (holdingContainer == null) {
-            throw new IllegalStateException("Failed to find bundle in any container");
+            throw new IllegalStateException("Could not find bundle in any container");
         }
 
         return holdingContainer.key().javaContainerId();
