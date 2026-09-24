@@ -20,7 +20,7 @@ package net.raphimc.viabedrock.api.modinterface;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.protocols.v1_21_11to26_1.packet.ClientboundPackets26_1;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.model.SkinData;
 import net.raphimc.viabedrock.protocol.types.primitive.ImageType;
@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 
-public class BedrockSkinUtilityInterface {
+public final class BedrockSkinUtilityInterface {
 
     public static final String CHANNEL = "bedrockskin:data";
     private static final int VERSION = 1;
@@ -51,7 +51,7 @@ public class BedrockSkinUtilityInterface {
         final int chunkCount = (int) Math.ceil(skinData.length / (double) maxPayloadSize);
 
         {
-            final PacketWrapper pluginMessage = PacketWrapper.create(ClientboundPackets26_1.CUSTOM_PAYLOAD, user);
+            final PacketWrapper pluginMessage = PacketWrapper.create(ClientboundPackets26_3.CUSTOM_PAYLOAD, user);
             pluginMessage.write(Types.STRING, CHANNEL); // Channel
             pluginMessage.write(Types.INT, MESSAGE_SKIN_INFORMATION);
             pluginMessage.write(Types.INT, VERSION);
@@ -68,7 +68,7 @@ public class BedrockSkinUtilityInterface {
             pluginMessage.send(BedrockProtocol.class);
         }
         for (int i = 0; i < chunkCount; i++) {
-            final PacketWrapper pluginMessage = PacketWrapper.create(ClientboundPackets26_1.CUSTOM_PAYLOAD, user);
+            final PacketWrapper pluginMessage = PacketWrapper.create(ClientboundPackets26_3.CUSTOM_PAYLOAD, user);
             pluginMessage.write(Types.STRING, CHANNEL); // Channel
             pluginMessage.write(Types.INT, MESSAGE_SKIN_DATA);
             pluginMessage.write(Types.UUID, uuid);
@@ -83,7 +83,7 @@ public class BedrockSkinUtilityInterface {
         if (skin.capeData() != null) {
             final byte[] capeData = ImageType.getImageData(skin.capeData());
 
-            final PacketWrapper pluginMessage = PacketWrapper.create(ClientboundPackets26_1.CUSTOM_PAYLOAD, user);
+            final PacketWrapper pluginMessage = PacketWrapper.create(ClientboundPackets26_3.CUSTOM_PAYLOAD, user);
             pluginMessage.write(Types.STRING, CHANNEL); // Channel
             pluginMessage.write(Types.INT, MESSAGE_CAPE);
             pluginMessage.write(Types.INT, VERSION);
@@ -100,6 +100,9 @@ public class BedrockSkinUtilityInterface {
     private static void writeString(final PacketWrapper wrapper, final String s) {
         wrapper.write(Types.INT, s.length());
         wrapper.write(Types.REMAINING_BYTES, s.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private BedrockSkinUtilityInterface() {
     }
 
 }

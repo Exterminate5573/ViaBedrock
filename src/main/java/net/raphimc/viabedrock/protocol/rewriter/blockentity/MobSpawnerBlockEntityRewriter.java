@@ -24,7 +24,7 @@ import com.viaversion.nbt.tag.StringTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.blockentity.BlockEntity;
 import com.viaversion.viaversion.api.minecraft.blockentity.BlockEntityImpl;
-import com.viaversion.viaversion.api.minecraft.entities.EntityTypes1_21_11;
+import com.viaversion.viaversion.api.minecraft.entities.EntityTypes26_3;
 import com.viaversion.viaversion.util.Key;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.chunk.BedrockBlockEntity;
@@ -36,7 +36,7 @@ import java.util.logging.Level;
 public class MobSpawnerBlockEntityRewriter implements BlockEntityRewriter.Rewriter {
 
     @Override
-    public BlockEntity toJava(UserConnection user, BedrockBlockEntity bedrockBlockEntity) {
+    public BlockEntity toJava(final UserConnection user, final BedrockBlockEntity bedrockBlockEntity) {
         final CompoundTag bedrockTag = bedrockBlockEntity.tag();
         final CompoundTag javaTag = new CompoundTag();
 
@@ -55,7 +55,7 @@ public class MobSpawnerBlockEntityRewriter implements BlockEntityRewriter.Rewrit
         }
         if (bedrockTag.get("EntityIdentifier") instanceof StringTag entityIdentifierTag) {
             final String bedrockEntityIdentifier = entityIdentifierTag.getValue();
-            final EntityTypes1_21_11 javaEntityType = BedrockProtocol.MAPPINGS.getBedrockToJavaEntities().get(Key.namespaced(bedrockEntityIdentifier));
+            final EntityTypes26_3 javaEntityType = BedrockProtocol.MAPPINGS.getBedrockToJavaEntities().get(Key.namespaced(bedrockEntityIdentifier));
             if (javaEntityType != null) {
                 final CompoundTag spawnData = new CompoundTag();
                 final CompoundTag entityTag = new CompoundTag();

@@ -22,12 +22,12 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.function.ToIntFunction;
 
-public class EnumUtil {
+public final class EnumUtil {
 
     public static <T extends Enum<T>> T getEnumConstantOrNull(final Class<T> enumClass, final String name) {
         try {
             return Enum.valueOf(enumClass, name);
-        } catch (IllegalArgumentException e) {
+        } catch (final IllegalArgumentException e) {
             return null;
         }
     }
@@ -76,15 +76,7 @@ public class EnumUtil {
         return bitmask;
     }
 
-    public static <T extends Enum<T>> BigInteger getBigBitmaskFromEnumSet(final Set<T> set, final ToIntFunction<T> bitGetter) {
-        BigInteger bitmask = BigInteger.ZERO;
-        for (T constant : set) {
-            final int bit = bitGetter.applyAsInt(constant);
-            if (bit >= 0) {
-                bitmask = bitmask.setBit(bit);
-            }
-        }
-        return bitmask;
+    private EnumUtil() {
     }
 
 }

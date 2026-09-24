@@ -34,22 +34,17 @@ public abstract class StatelessProtocol<CU extends ClientboundPacketType, CM ext
     }
 
     @Override
-    public void transform(Direction direction, State state, PacketWrapper packetWrapper) throws InformativeException, CancelException {
-        if (state == State.STATUS) { // Needed for RakNet ping workaround
-            super.transform(direction, state, packetWrapper);
-            return;
-        }
-
+    public void transform(final Direction direction, final State state, final PacketWrapper packetWrapper) throws InformativeException, CancelException {
         super.transform(direction, direction == Direction.SERVERBOUND ? state : State.PLAY, packetWrapper);
     }
 
     @Override
     protected PacketTypesProvider<CU, CM, SM, SU> createPacketTypesProvider() {
         return new SimplePacketTypesProvider<>(
-                Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.unmappedClientboundPacketType)),
-                Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.mappedClientboundPacketType)),
-                Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.mappedServerboundPacketType)),
-                Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.unmappedServerboundPacketType))
+            Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.unmappedClientboundPacketType)),
+            Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.mappedClientboundPacketType)),
+            Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.mappedServerboundPacketType)),
+            Map.of(State.PLAY, PacketTypeMap.ofUnsequenced(this.unmappedServerboundPacketType))
         );
     }
 

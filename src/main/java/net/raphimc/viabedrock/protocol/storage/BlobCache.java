@@ -59,10 +59,10 @@ public class BlobCache extends StoredObject {
 
         final PacketWrapper clientCacheBlobStatus = PacketWrapper.create(ServerboundBedrockPackets.CLIENT_CACHE_BLOB_STATUS, this.user());
         clientCacheBlobStatus.write(BedrockTypes.UNSIGNED_VAR_INT, missingSubSet.size()); // missing blob count
-        clientCacheBlobStatus.write(BedrockTypes.UNSIGNED_VAR_INT, ackedSubSet.size()); // acked blob count
         for (long hash : missingSubSet) {
             clientCacheBlobStatus.write(BedrockTypes.LONG_LE, hash); // missing blob hash
         }
+        clientCacheBlobStatus.write(BedrockTypes.UNSIGNED_VAR_INT, ackedSubSet.size()); // acked blob count
         for (long hash : ackedSubSet) {
             clientCacheBlobStatus.write(BedrockTypes.LONG_LE, hash); // acked blob hash
         }
@@ -126,16 +126,18 @@ public class BlobCache extends StoredObject {
                 for (long hash : hashes) {
                     output.write(Via.getManager().getProviders().get(BlobCacheProvider.class).getBlob(hash));
                 }
-            } catch (IOException ignored) {
+            } catch (final IOException ignored) {
             }
             return CompletableFuture.completedFuture(output.toByteArray());
         }
 
         final CompletableFuture<byte[]> rootFuture = new CompletableFuture<>();
         for (long hash : hashes) {
-            if (this.hasBlob(hash)) continue;
+            if (this.hasBlob(hash)) {
+                continue;
+            }
 
-            CompletableFuture<byte[]> subFuture = new CompletableFuture<>();
+            final CompletableFuture<byte[]> subFuture = new CompletableFuture<>();
             final CompletableFuture<byte[]> existing = this.pending.get(hash);
             if (existing != null) {
                 subFuture.whenComplete((blob, throwable) -> {

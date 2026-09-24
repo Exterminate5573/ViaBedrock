@@ -6,6 +6,7 @@ import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap;
 
 public enum CreativeItemCategory {
 
+    All(0),
     Construction(1),
     Nature(2),
     Equipment(3),
